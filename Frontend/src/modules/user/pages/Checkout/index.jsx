@@ -1,0 +1,1067 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { io } from 'socket.io-client';
+import { FiArrowLeft, FiShoppingCart, FiTrash2, FiMinus, FiPlus, FiPhone, FiHome, FiClock, FiEdit2 } from 'react-icons/fi';
+import { MdStar } from 'react-icons/md';
+import { toast } from 'react-hot-toast';
+import { themeColors } from '../../../../theme';
+import BottomNav from '../../components/layout/BottomNav';
+import AddressSelectionModal from './components/AddressSelectionModal';
+import TimeSlotModal from './components/TimeSlotModal';
+import VendorSearchModal from './components/VendorSearchModal';
+import { bookingService } from '../../../../services/bookingService';
+import { paymentService } from '../../../../services/paymentService';
+import { cartService } from '../../../../services/cartService';
+
+const toAssetUrl = (url) => {
+  if (!url) return '';
+  const clean = url.replace('/api/upload', '/upload');
+  if (clean.startsWith('http')) return clean;
+  const base = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000').replace(/\/api$/, '');
+  return `${base}${clean.startsWith('/') ? '' : '/'}${clean}`;
+};
+
+const Checkout = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const category = location.state?.category || null; // Get category from navigation state
+
+  const [cartItems, setCartItems] = useState([]);
+  const [isPlusAdded, setIsPlusAdded] = useState(false);
+  const [showAddressModal, setShowAddressModal] = useState(false);
+  const [showTimeSlotModal, setShowTimeSlotModal] = useState(false);
+  const [address, setAddress] = useState('');
+  const [houseNumber, setHouseNumber] = useState('');
+  const [addressDetails, setAddressDetails] = useState(null);
+  const [razorpayLoaded, setRazorpayLoaded] = useState(false);
+  const [userPhone, setUserPhone] = useState('');
+
+  // New state for vendor search flow
+  const [currentStep, setCurrentStep] = useState('details'); // 'details' | 'searching' | 'waiting' | 'accepted' | 'payment'
+  const [acceptedVendor, setAcceptedVendor] = useState(null);
+  const [bookingRequest, setBookingRequest] = useState(null);
+  const [searchingVendors, setSearchingVendors] = useState(false);
+  const [showVendorModal, setShowVendorModal] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState('online'); // 'online' | 'pay_at_home'
+
+  const [loading, setLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [selectedTime, setSelectedTime] = useState(null);
+
+  // Check if Razorpay is loaded (defer to avoid blocking initial render)
+  useEffect(() => {
+    // Defer Razorpay check until after page load
+    const checkRazorpay = () => {
+      if (window.Razorpay) {
+        setRazorpayLoaded(true);
+      } else {
+        // Retry after a short delay (non-blocking)
+        setTimeout(checkRazorpay, 100);
+      }
+    };
+
+    // Use requestIdleCallback if available, otherwise setTimeout
+    if (window.requestIdleCallback) {
+      window.requestIdleCallback(checkRazorpay, { timeout: 200 });
+    } else {
+      setTimeout(checkRazorpay, 100);
+    }
+  }, []);
+
+  // Load user data and cart
+  useEffect(() => {
+    const storedUserData = localStorage.getItem('userData');
+    if (storedUserData) {
+      const userData = JSON.parse(storedUserData);
+      if (userData.phone) {
+        setUserPhone(userData.phone);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCart();
+  }, [category]);
+
+  const loadCart = async () => {
+    try {
+      setLoading(true);
+      const response = await cartService.getCart();
+      if (response.success) {
+        let items = response.data || [];
+        if (category) {
+          items = items.filter(item => item.category === category);
+        }
+        setCartItems(items);
+      } else {
+        setCartItems([]);
+      }
+    } catch (error) {
+      setCartItems([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cartCount = cartItems.length;
+
+  const handleBack = () => {
+    navigate(-1);
+  };
+
+  const handleQuantityChange = async (itemId, change) => {
+    try {
+      const item = cartItems.find(i => (i._id || i.id) === itemId);
+      if (!item) return;
+
+      const newCount = Math.max(1, (item.serviceCount || 1) + change);
+      const response = await cartService.updateItem(itemId, newCount);
+
+      if (response.success) {
+        // Reload cart and filter by category
+        const cartResponse = await cartService.getCart();
+        if (cartResponse.success) {
+          let items = cartResponse.data || [];
+          if (category) {
+            items = items.filter(item => item.category === category);
+          }
+          setCartItems(items);
+        }
+      } else {
+        toast.error(response.message || 'Failed to update quantity');
+      }
+    } catch (error) {
+      toast.error('Failed to update quantity');
+    }
+  };
+
+  const handleRemoveItem = async (itemId) => {
+    try {
+      const response = await cartService.removeItem(itemId);
+      if (response.success) {
+        toast.success('Item removed');
+        loadCart();
+      } else {
+        toast.error(response.message || 'Failed to remove item');
+      }
+    } catch (error) {
+      toast.error('Failed to remove item');
+    }
+  };
+
+  const handleAddPlus = () => {
+    setIsPlusAdded(!isPlusAdded);
+  };
+
+  const getAddressComponent = (type) => {
+    return addressDetails?.components?.find(c => c.types.includes(type))?.long_name || '';
+  };
+
+  const handleProceed = async () => {
+    if (!addressDetails || !selectedDate || !selectedTime) {
+      if (!addressDetails) setShowAddressModal(true);
+      else if (!selectedDate || !selectedTime) setShowTimeSlotModal(true);
+      return;
+    }
+
+    try {
+      setSearchingVendors(true);
+      setShowVendorModal(true);
+      setCurrentStep('searching');
+
+      // Add a small delay for realistic searching animation
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      const firstItem = cartItems[0];
+      if (!firstItem) {
+        toast.error('Your cart is empty');
+        return;
+      }
+      const serviceId = typeof firstItem.serviceId === 'object'
+        ? firstItem.serviceId._id || firstItem.serviceId.id
+        : firstItem.serviceId;
+
+      const response = await bookingService.create({
+        serviceId,
+        address: {
+          type: addressDetails?.type || 'home',
+          addressLine1: addressDetails?.addressLine1 || address,
+          addressLine2: houseNumber,
+          city: getAddressComponent('locality') || getAddressComponent('administrative_area_level_2') || 'City',
+          state: getAddressComponent('administrative_area_level_1') || 'State',
+          pincode: getAddressComponent('postal_code') || '000000',
+          lat: addressDetails?.lat,
+          lng: addressDetails?.lng
+        },
+        scheduledDate: selectedDate,
+        scheduledTime: getTimeSlots().find(slot => slot.value === selectedTime)?.display || selectedTime,
+        timeSlot: {
+          start: selectedTime,
+          end: getTimeSlots().find(slot => slot.value === selectedTime)?.end || selectedTime
+        },
+        amount: amountToPay,
+        paymentMethod: 'online',
+        isPlusAdded: isPlusAdded
+      });
+
+      if (response.success) {
+        setBookingRequest(response.data);
+        setCurrentStep('accepted');
+        setAcceptedVendor({
+          ...(response.data.vendorId || {
+            name: 'Professional Assigned',
+            businessName: 'Expert Service Pro',
+            rating: 4.8,
+            totalJobs: 156,
+            avatar: '/assets/provider-avatar.png'
+          }),
+          price: response.data.finalAmount || amountToPay,
+          distance: 'within 5km',
+          estimatedTime: '15-30 min'
+        });
+      }
+    } catch (error) {
+      toast.error('No vendors available at this time. Please try again.');
+      setShowVendorModal(false);
+    } finally {
+      setSearchingVendors(false);
+    }
+  };
+
+
+  // Listen for real-time vendor acceptance
+  useEffect(() => {
+    if (currentStep !== 'waiting' || !bookingRequest) return;
+
+    const socketUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:5000';
+    const socket = io(socketUrl, {
+      auth: { token: localStorage.getItem('accessToken') },
+      transports: ['websocket', 'polling']
+    });
+
+    socket.on('connect', () => {
+    });
+
+    socket.on('connect_error', (err) => {
+    });
+
+    socket.on('booking_accepted', (data) => {
+      if (data.bookingId === bookingRequest._id) {
+
+        // Construct vendor object from event data
+        // Note: Real backend should send full details, falling back to defaults for display
+        const vendorData = {
+          id: data.vendor.id,
+          name: data.vendor.name || 'Vendor',
+          businessName: data.vendor.businessName || 'Service Provider',
+          rating: 4.8, // Default if not sent
+          distance: 'Nearby', // Default if not sent
+          estimatedTime: '15-20 mins',
+          price: bookingRequest.amount
+        };
+
+        setAcceptedVendor(vendorData);
+        setCurrentStep('accepted');
+        toast.success(`${vendorData.businessName} accepted your booking!`);
+
+        // Close modal after 2 seconds to show "Proceed to Pay" button
+        setTimeout(() => {
+          setShowVendorModal(false);
+          setCurrentStep('payment');
+        }, 2000);
+      }
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [currentStep, bookingRequest]);
+
+  // Search for nearby vendors
+  const handleSearchVendors = async () => {
+    try {
+      // Validate required fields
+      if (!selectedDate || !selectedTime || !houseNumber) {
+        toast.error('Please select address and time slot');
+        return;
+      }
+
+      if (cartItems.length === 0) {
+        toast.error('Cart is empty');
+        return;
+      }
+
+      // Open modal and start searching
+      setShowVendorModal(true);
+      setCurrentStep('searching');
+      setSearchingVendors(true);
+
+      // Get first service
+      const firstItem = cartItems[0];
+      if (!firstItem.serviceId) {
+        toast.error('Service information missing. Please try again.');
+        setCurrentStep('details');
+        setSearchingVendors(false);
+        setShowVendorModal(false);
+        return;
+      }
+
+      // Prepare address object
+      const addressObj = {
+        type: 'home',
+        addressLine1: address,
+        addressLine2: houseNumber,
+        city: getAddressComponent('locality') || getAddressComponent('administrative_area_level_2') || 'City',
+        state: getAddressComponent('administrative_area_level_1') || 'State',
+        pincode: getAddressComponent('postal_code') || '123456',
+        landmark: addressDetails?.landmark || '',
+        lat: addressDetails?.lat || null,
+        lng: addressDetails?.lng || null
+      };
+
+      // Prepare time slot
+      const timeSlotObj = {
+        start: selectedTime,
+        end: getTimeSlots().find(slot => slot.value === selectedTime)?.end || selectedTime
+      };
+
+      // Create booking request
+      toast.loading('Searching for nearby vendors...');
+
+      // Ensure serviceId is a string (handle populated cart data)
+      const serviceId = typeof firstItem.serviceId === 'object'
+        ? firstItem.serviceId._id || firstItem.serviceId.id
+        : firstItem.serviceId;
+
+      const bookingResponse = await bookingService.create({
+        serviceId: serviceId,
+        address: addressObj,
+        scheduledDate: selectedDate.toISOString(),
+        scheduledTime: getTimeSlots().find(slot => slot.value === selectedTime)?.display || selectedTime,
+        timeSlot: timeSlotObj,
+        userNotes: `Items: ${cartItems.map(i => i.title).join(', ')}`,
+        paymentMethod: 'razorpay',
+        amount: amountToPay,
+        isPlusAdded: isPlusAdded
+      });
+
+      if (!bookingResponse.success) {
+        toast.dismiss();
+        toast.error(bookingResponse.message || 'Failed to search for vendors');
+        setCurrentStep('details');
+        setSearchingVendors(false);
+        setShowVendorModal(false);
+        return;
+      }
+
+      const booking = bookingResponse.data;
+      setBookingRequest(booking);
+      toast.dismiss();
+
+      // Move to waiting state - alerts sent to nearby vendors
+      setCurrentStep('waiting');
+      setSearchingVendors(false);
+      toast.success('Finding nearby vendors... Alerts sent to vendors within 10km!');
+
+    } catch (error) {
+      toast.dismiss();
+      console.error('Search vendors error:', error);
+      toast.error('Failed to search for vendors. Please try again.');
+      setCurrentStep('details');
+      setSearchingVendors(false);
+      setShowVendorModal(false);
+    }
+  };
+
+  // Proceed to payment after vendor acceptance
+  const handleOnlinePayment = async () => {
+    try {
+      if (!acceptedVendor || !bookingRequest) {
+        toast.error('No vendor selected or booking not created');
+        return;
+      }
+
+      // Create Razorpay order
+      toast.loading('Creating payment order...');
+      const orderResponse = await paymentService.createOrder(bookingRequest._id);
+
+      if (!orderResponse.success) {
+        toast.dismiss();
+        toast.error(orderResponse.message || 'Failed to create payment order');
+        return;
+      }
+
+      toast.dismiss();
+
+      // Get Razorpay key
+      const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID;
+      if (!razorpayKey) {
+        toast.error('Razorpay key not configured');
+        return;
+      }
+
+      if (!window.Razorpay) {
+        toast.error('Razorpay SDK not loaded');
+        return;
+      }
+
+      const options = {
+        key: razorpayKey,
+        amount: orderResponse.data.amount * 100,
+        currency: orderResponse.data.currency || 'INR',
+        order_id: orderResponse.data.orderId,
+        name: 'Appzeto',
+        description: `Payment for ${bookingRequest.serviceName || 'service'}`,
+        handler: async function (response) {
+          try {
+            toast.loading('Verifying payment...');
+            const verifyResponse = await paymentService.verifyPayment({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature
+            });
+
+            toast.dismiss();
+
+            if (verifyResponse.success) {
+              toast.success('Payment successful!');
+
+              // Clear cart (or just category items)
+              try {
+                if (category) {
+                  await cartService.removeCategoryItems(category);
+                } else {
+                  await cartService.clearCart();
+                }
+                setCartItems([]);
+              } catch (error) {
+              }
+
+              // Navigate to booking confirmation
+              navigate(`/user/booking-confirmation/${bookingRequest._id}`, {
+                replace: true
+              });
+            } else {
+              toast.error(verifyResponse.message || 'Payment verification failed');
+            }
+          } catch (error) {
+            toast.dismiss();
+            toast.error('Failed to verify payment');
+          }
+        },
+        prefill: {
+          name: JSON.parse(localStorage.getItem('userData'))?.name || 'User',
+          email: JSON.parse(localStorage.getItem('userData'))?.email || '',
+          contact: userPhone
+        },
+        theme: {
+          color: themeColors.button
+        }
+      };
+
+      const razorpay = new window.Razorpay(options);
+      razorpay.on('payment.failed', function (response) {
+        toast.dismiss();
+        toast.error(`Payment failed: ${response.error.description || 'Unknown error'}`);
+      });
+      razorpay.open();
+
+    } catch (error) {
+      toast.dismiss();
+      toast.error('Failed to process payment');
+    }
+  };
+
+  const handlePayAtHome = async () => {
+    try {
+      if (!bookingRequest) return;
+      toast.loading('Confirming booking...');
+      const response = await paymentService.confirmPayAtHome(bookingRequest._id);
+      toast.dismiss();
+
+      if (response.success) {
+        toast.success('Booking confirmed!');
+        // Clear cart (or just category items)
+        try {
+          if (category) {
+            await cartService.removeCategoryItems(category);
+          } else {
+            await cartService.clearCart();
+          }
+          setCartItems([]);
+        } catch (error) {
+        }
+        // Navigate to booking confirmation
+        navigate(`/user/booking-confirmation/${bookingRequest._id}`, {
+          replace: true
+        });
+      } else {
+        toast.error(response.message || 'Failed to confirm booking');
+      }
+    } catch (error) {
+      toast.dismiss();
+      toast.error('Failed to process request');
+    }
+  };
+
+  const handlePayment = async () => {
+    if (paymentMethod === 'online') {
+      await handleOnlinePayment();
+    } else {
+      await handlePayAtHome();
+    }
+  };
+
+  const handleAddressSave = (savedHouseNumber, locationObj) => {
+    setHouseNumber(savedHouseNumber);
+    if (locationObj) {
+      setAddress(locationObj.address);
+      setAddressDetails(locationObj);
+    }
+    setShowAddressModal(false);
+    setShowTimeSlotModal(true);
+  };
+
+  const handleTimeSlotSave = (date, time) => {
+    setSelectedDate(date);
+    setSelectedTime(time);
+    setShowTimeSlotModal(false);
+  };
+
+  const handleCartClick = () => {
+    navigate('/user/cart');
+  };
+
+  // Calculate totals
+  const itemTotal = cartItems.reduce((sum, item) => sum + (item.price || 0), 0);
+  const totalOriginalPrice = cartItems.reduce((sum, item) => sum + ((item.originalPrice || item.unitPrice || (item.price / (item.serviceCount || 1))) * (item.serviceCount || 1)), 0);
+  const savings = totalOriginalPrice - itemTotal;
+  const taxesAndFee = 45;
+  const visitedFee = 29;
+  const totalAmount = itemTotal + (isPlusAdded ? 249 : 0) + taxesAndFee + visitedFee;
+  const amountToPay = totalAmount;
+
+  // Date and time slot helper functions
+  const getDates = () => {
+    const dates = [];
+    const today = new Date();
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(today);
+      date.setDate(today.getDate() + i);
+      dates.push(date);
+    }
+    return dates;
+  };
+
+  const getTimeSlots = () => {
+    return [
+      { value: '09:00', end: '10:00', display: '9:00 AM' },
+      { value: '10:00', end: '11:00', display: '10:00 AM' },
+      { value: '11:00', end: '12:00', display: '11:00 AM' },
+      { value: '12:00', end: '13:00', display: '12:00 PM' },
+      { value: '13:00', end: '14:00', display: '1:00 PM' },
+      { value: '14:00', end: '15:00', display: '2:00 PM' },
+      { value: '15:00', end: '16:00', display: '3:00 PM' },
+      { value: '16:00', end: '17:00', display: '4:00 PM' },
+      { value: '17:00', end: '18:00', display: '5:00 PM' },
+      { value: '18:00', end: '19:00', display: '6:00 PM' },
+      { value: '19:00', end: '20:00', display: '7:00 PM' },
+      { value: '20:00', end: '21:00', display: '8:00 PM' },
+    ];
+  };
+
+  const formatDate = (date) => {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    return {
+      day: days[date.getDay()],
+      date: date.getDate(),
+    };
+  };
+
+
+
+  const isDateSelected = (date) => {
+    return selectedDate && date.toDateString() === selectedDate.toDateString();
+  };
+
+  const isTimeSelected = (time) => {
+    return selectedTime === time;
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white pb-32 flex items-center justify-center">
+        <div className="flex flex-col items-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mb-4" style={{ borderColor: themeColors.button }}></div>
+          <p className="text-gray-500">Loading checkout details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (cartItems.length === 0) {
+    return (
+      <div className="min-h-screen bg-white pb-32">
+        <header className="bg-white">
+          <div className="px-4 pt-4 pb-3">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleBack}
+                className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <FiArrowLeft className="w-6 h-6 text-black" />
+              </button>
+              <h1 className="text-xl font-bold text-black">Your cart</h1>
+            </div>
+          </div>
+          <div className="border-b border-gray-200"></div>
+        </header>
+        <main className="px-4 py-4">
+          <div className="flex flex-col items-center justify-center py-20">
+            <FiShoppingCart className="w-16 h-16 text-gray-300 mb-4" />
+            <p className="text-gray-500 text-lg font-medium">Your cart is empty</p>
+            <p className="text-gray-400 text-sm mt-2">Add services to get started</p>
+          </div>
+        </main>
+        <BottomNav />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-white pb-80">
+      {/* Header */}
+      <header className="bg-white">
+        <div className="px-4 pt-4 pb-3">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleBack}
+              className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+            >
+              <FiArrowLeft className="w-6 h-6 text-black" />
+            </button>
+            <h1 className="text-xl font-bold text-black">
+              {category ? `${category} Checkout` : 'Your cart'}
+            </h1>
+          </div>
+        </div>
+        <div className="border-b border-gray-200"></div>
+      </header>
+
+      <main className="px-4 py-4">
+        {/* Savings Banner */}
+        {savings > 0 && (
+          <div className="bg-green-50 border border-green-100 rounded-2xl p-4 mb-6 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center shrink-0 shadow-lg shadow-green-200">
+                <MdStar className="text-white w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-green-600 uppercase tracking-wider">Smart Choice!</p>
+                <p className="text-sm font-black text-slate-900">
+                  You're saving ₹{savings.toLocaleString('en-IN')}
+                </p>
+              </div>
+            </div>
+            <div className="bg-white px-3 py-1 rounded-full shadow-sm border border-green-100">
+              <span className="text-[10px] font-black text-green-600">BEST PRICE</span>
+            </div>
+          </div>
+        )}
+
+        {/* Cart Items */}
+        <div className="space-y-4 mb-4">
+          {cartItems.map((item) => (
+            <div key={item._id} className="bg-white border border-gray-200 rounded-lg p-4">
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex-1">
+                  <h3 className="text-base font-bold text-black mb-1">{item.title}</h3>
+                  {item.description && (
+                    <p className="text-sm text-gray-600">{item.description}</p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 border rounded-lg" style={{ borderColor: themeColors.button }}>
+                  <button
+                    onClick={() => handleQuantityChange(item._id, -1)}
+                    className="p-2 transition-colors"
+                    onMouseEnter={(e) => e.target.style.backgroundColor = `${themeColors.brand.teal}1A`}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                  >
+                    <FiMinus className="w-4 h-4" style={{ color: themeColors.button }} />
+                  </button>
+                  <span className="px-3 py-1 text-sm font-medium text-black">{item.serviceCount || 1}</span>
+                  <button
+                    onClick={() => handleQuantityChange(item._id, 1)}
+                    className="p-2 transition-colors"
+                    onMouseEnter={(e) => e.target.style.backgroundColor = `${themeColors.brand.teal}1A`}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                  >
+                    <FiPlus className="w-4 h-4" style={{ color: themeColors.button }} />
+                  </button>
+                </div>
+                <button
+                  onClick={() => handleRemoveItem(item._id)}
+                  className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+                >
+                  <FiTrash2 className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-base font-bold text-black">₹{(item.price || 0).toLocaleString('en-IN')}</span>
+                {(() => {
+                  const unitPrice = item.unitPrice || (item.price / (item.serviceCount || 1));
+                  const unitOriginalPrice = item.originalPrice || unitPrice;
+                  const currentTotal = item.price;
+                  const originalTotal = unitOriginalPrice * (item.serviceCount || 1);
+                  if (originalTotal > currentTotal) {
+                    return (
+                      <span className="text-sm text-gray-400 line-through">
+                        ₹{originalTotal.toLocaleString('en-IN')}
+                      </span>
+                    );
+                  }
+                  return null;
+                })()}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Plus Membership Plan */}
+        <div className="rounded-lg p-4 mb-4" style={{ backgroundColor: `${themeColors.brand.teal}1A` }}>
+          <div className="flex items-start justify-between mb-2">
+            <div className="flex items-start gap-3 flex-1">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: themeColors.button }}>
+                <MdStar className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-base font-bold text-black mb-1">plus</h3>
+                <p className="text-sm text-gray-700 mb-1">6 months plan</p>
+                <p className="text-xs text-gray-600 mb-2">
+                  Get 10% off on all bookings, upto ₹100.
+                </p>
+                <button className="text-xs font-medium hover:underline" style={{ color: themeColors.button }}>
+                  View all benefits
+                </button>
+              </div>
+            </div>
+            <div className="flex flex-col items-end">
+              <button
+                onClick={handleAddPlus}
+                className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                style={isPlusAdded ? {
+                  backgroundColor: themeColors.button,
+                  color: 'white'
+                } : {
+                  backgroundColor: 'white',
+                  border: `1px solid ${themeColors.button}`,
+                  color: themeColors.button
+                }}
+                onMouseEnter={(e) => {
+                  if (!isPlusAdded) {
+                    e.target.style.backgroundColor = `${themeColors.brand.teal}1A`;
+                  } else {
+                    e.target.style.backgroundColor = themeColors.button;
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isPlusAdded) {
+                    e.target.style.backgroundColor = 'white';
+                  } else {
+                    e.target.style.backgroundColor = themeColors.button;
+                  }
+                }}
+              >
+                {isPlusAdded ? 'Added' : 'Add'}
+              </button>
+              <div className="mt-1 flex flex-col items-end">
+                <span className="text-sm font-bold text-black">₹249</span>
+                <span className="text-xs text-gray-400 line-through">₹699</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Verified Customer */}
+        <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <FiPhone className="w-5 h-5 text-gray-600" />
+              <div>
+                <p className="text-sm font-medium text-black">{JSON.parse(localStorage.getItem('userData'))?.name || 'Verified Customer'}</p>
+                <p className="text-xs text-gray-600">{userPhone || 'Loading...'}</p>
+              </div>
+            </div>
+            <button className="text-sm font-medium hover:underline" style={{ color: themeColors.button }}>
+              Change
+            </button>
+          </div>
+        </div>
+
+        {/* Payment Summary */}
+        <div className="bg-white border-2 border-slate-100 rounded-2xl p-5 mb-6 shadow-sm overflow-hidden relative">
+          {/* Decorative Background for Header */}
+          <div className="absolute top-0 left-0 right-0 h-1" style={{ background: themeColors.gradient }}></div>
+
+          <h3 className="text-lg font-bold text-slate-900 mb-5 flex items-center gap-2">
+            <FiShoppingCart className="w-5 h-5" style={{ color: themeColors.button }} />
+            Payment Summary
+          </h3>
+
+          <div className="space-y-4">
+            <div className="flex justify-between items-center group">
+              <span className="text-sm font-medium text-slate-600 group-hover:text-slate-900 transition-colors">Item Total</span>
+              <div className="flex items-center gap-2">
+                {totalOriginalPrice > itemTotal && (
+                  <span className="text-xs text-slate-400 line-through">
+                    ₹{totalOriginalPrice.toLocaleString('en-IN')}
+                  </span>
+                )}
+                <span className="text-sm font-bold text-slate-900">₹{itemTotal.toLocaleString('en-IN')}</span>
+              </div>
+            </div>
+
+            {isPlusAdded && (
+              <div className="flex justify-between items-center -mx-5 px-5 py-3 border-y" style={{ backgroundColor: `${themeColors.brand.teal}0D`, borderColor: `${themeColors.brand.teal}1A` }}>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: `${themeColors.brand.teal}26` }}>
+                    <MdStar className="w-4 h-4" style={{ color: themeColors.button }} />
+                  </div>
+                  <span className="text-sm font-semibold" style={{ color: themeColors.button }}>Plus Membership</span>
+                </div>
+                <span className="text-sm font-bold" style={{ color: themeColors.button }}>₹249</span>
+              </div>
+            )}
+
+            <div className="space-y-3 pb-2">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-slate-500">Taxes and Fee</span>
+                <span className="text-sm font-medium text-slate-900">₹{taxesAndFee}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-slate-500">Visited Fee</span>
+                <span className="text-sm font-medium text-slate-900">₹{visitedFee}</span>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-100 pt-5 mt-1">
+              <div className="flex justify-between items-end">
+                <div>
+                  <span className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Total Payable</span>
+                  <span className="text-2xl font-black text-slate-900 leading-none">
+                    ₹{totalAmount.toLocaleString('en-IN')}
+                  </span>
+                </div>
+                <div className="text-right">
+                  {totalOriginalPrice > itemTotal && (
+                    <span className="inline-flex items-center gap-1 bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded-full animate-pulse">
+                      <MdStar className="w-3 h-3" />
+                      SAVED ₹{(totalOriginalPrice - itemTotal).toLocaleString('en-IN')}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Cancellation Policy */}
+        <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
+          <h3 className="text-base font-bold text-black mb-2">Cancellation policy</h3>
+          <p className="text-sm text-gray-700 mb-2">
+            Free cancellations if done more than 12 hrs before the service or if a professional isn't assigned. A fee will be charged otherwise.
+          </p>
+          <button className="text-sm font-medium hover:underline" style={{ color: themeColors.button }}>
+            Read full policy
+          </button>
+        </div>
+
+        {/* Payment Method Selection - Only show when vendor accepted */}
+        {currentStep === 'payment' && (
+          <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
+            <h3 className="text-base font-bold text-black mb-4">Select Payment Method</h3>
+            <div className="space-y-3">
+              <label
+                className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer`}
+                style={{
+                  borderColor: paymentMethod === 'online' ? themeColors.button : '#F3F4F6',
+                  backgroundColor: paymentMethod === 'online' ? `${themeColors.brand.teal}0D` : 'transparent'
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center ${paymentMethod === 'online' ? 'text-white' : 'bg-gray-100 text-gray-500'}`}
+                    style={paymentMethod === 'online' ? { backgroundColor: themeColors.button } : {}}
+                  >
+                    <FiShoppingCart className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-gray-900">Online Payment</p>
+                    <p className="text-xs text-gray-500">Razorpay, UPI, Cards</p>
+                  </div>
+                </div>
+                <input
+                  type="radio"
+                  name="paymentMethod"
+                  className="w-5 h-5"
+                  style={{ accentColor: themeColors.button }}
+                  checked={paymentMethod === 'online'}
+                  onChange={() => setPaymentMethod('online')}
+                />
+              </label>
+
+              <label
+                className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer`}
+                style={{
+                  borderColor: paymentMethod === 'pay_at_home' ? themeColors.button : '#F3F4F6',
+                  backgroundColor: paymentMethod === 'pay_at_home' ? `${themeColors.brand.teal}0D` : 'transparent'
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center ${paymentMethod === 'pay_at_home' ? 'text-white' : 'bg-gray-100 text-gray-500'}`}
+                    style={paymentMethod === 'pay_at_home' ? { backgroundColor: themeColors.button } : {}}
+                  >
+                    <FiHome className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-gray-900">Pay at Home</p>
+                    <p className="text-xs text-gray-500">Cash/UPI after service</p>
+                  </div>
+                </div>
+                <input
+                  type="radio"
+                  name="paymentMethod"
+                  className="w-5 h-5"
+                  style={{ accentColor: themeColors.button }}
+                  checked={paymentMethod === 'pay_at_home'}
+                  onChange={() => setPaymentMethod('pay_at_home')}
+                />
+              </label>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* Bottom Action Button */}
+      <div className="fixed bottom-16 left-0 right-0 bg-white border-t border-gray-200 z-40">
+        {/* Selected Address and Slot Display */}
+        {(selectedDate && selectedTime && houseNumber) && (
+          <div className="px-4 pt-3 pb-2 border-b border-gray-100">
+            <div className="space-y-2.5">
+              {/* Address */}
+              <div className="flex items-start gap-2.5">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5" style={{ backgroundColor: 'rgba(0, 166, 166, 0.1)' }}>
+                  <FiHome className="w-4 h-4" style={{ color: themeColors.button }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-gray-600 mb-0.5">Address</p>
+                  <p className="text-sm font-medium text-black">
+                    {houseNumber ? `${houseNumber}, ` : ''}{address}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowAddressModal(true)}
+                  className="p-1.5 hover:bg-gray-100 rounded-full transition-colors shrink-0 mt-0.5"
+                >
+                  <FiEdit2 className="w-4 h-4 text-gray-600" />
+                </button>
+              </div>
+              {/* Time Slot */}
+              <div className="flex items-start gap-2.5">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5" style={{ backgroundColor: 'rgba(0, 166, 166, 0.1)' }}>
+                  <FiClock className="w-4 h-4" style={{ color: themeColors.button }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-gray-600 mb-0.5">Time Slot</p>
+                  <p className="text-sm font-medium text-black">
+                    {selectedDate && (() => {
+                      const { day, date: dateNum } = formatDate(selectedDate);
+                      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                      const month = monthNames[selectedDate.getMonth()];
+                      return `${day}, ${dateNum} ${month}`;
+                    })()}
+                    {selectedTime && (() => {
+                      const timeSlot = getTimeSlots().find(slot => slot.value === selectedTime);
+                      return timeSlot ? ` • ${timeSlot.display}` : '';
+                    })()}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowTimeSlotModal(true)}
+                  className="p-1.5 hover:bg-gray-100 rounded-full transition-colors shrink-0 mt-0.5"
+                >
+                  <FiEdit2 className="w-4 h-4 text-gray-600" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="p-4">
+          <button
+            onClick={selectedDate && selectedTime && houseNumber ?
+              (currentStep === 'payment' ? handlePayment : handleSearchVendors) :
+              handleProceed}
+            disabled={searchingVendors}
+            className="w-full text-white py-3 rounded-lg text-base font-semibold transition-colors disabled:opacity-50"
+            style={{ backgroundColor: themeColors.button }}
+            onMouseEnter={(e) => e.target.style.backgroundColor = themeColors.button}
+            onMouseLeave={(e) => e.target.style.backgroundColor = themeColors.button}
+          >
+            {searchingVendors ? 'Searching for vendors...' :
+              currentStep === 'payment' ? (paymentMethod === 'online' ? 'Proceed to Pay' : 'Confirm Booking') :
+                selectedDate && selectedTime && houseNumber ?
+                  'Find nearby vendors' :
+                  'Add address and slot'}
+          </button>
+        </div>
+
+
+      </div>
+
+      <BottomNav />
+
+      {/* Vendor Search Modal */}
+      <VendorSearchModal
+        isOpen={showVendorModal}
+        onClose={() => {
+          setShowVendorModal(false);
+          if (currentStep === 'accepted') {
+            setCurrentStep('payment');
+          }
+        }}
+        currentStep={currentStep}
+        acceptedVendor={acceptedVendor}
+      />
+
+      {/* Address Selection Modal */}
+      <AddressSelectionModal
+        isOpen={showAddressModal}
+        onClose={() => setShowAddressModal(false)}
+        address={address}
+        houseNumber={houseNumber}
+        onHouseNumberChange={setHouseNumber}
+        onSave={handleAddressSave}
+      />
+
+      {/* Time Slot Modal */}
+      <TimeSlotModal
+        isOpen={showTimeSlotModal}
+        onClose={() => setShowTimeSlotModal(false)}
+        selectedDate={selectedDate}
+        selectedTime={selectedTime}
+        onDateSelect={setSelectedDate}
+        onTimeSelect={setSelectedTime}
+        onSave={handleTimeSlotSave}
+        getDates={getDates}
+        getTimeSlots={getTimeSlots}
+        formatDate={formatDate}
+        isDateSelected={isDateSelected}
+        isTimeSelected={isTimeSelected}
+      />
+    </div>
+  );
+};
+
+export default Checkout;

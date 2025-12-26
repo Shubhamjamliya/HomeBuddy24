@@ -1,0 +1,492 @@
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { GoogleMap, useJsApiLoader, DirectionsRenderer, OverlayView, PolylineF } from '@react-google-maps/api';
+import { FiArrowLeft, FiNavigation, FiMapPin, FiCrosshair, FiPhone } from 'react-icons/fi';
+import { bookingService } from '../../../../services/bookingService';
+import { toast } from 'react-hot-toast';
+import { useAppNotifications } from '../../../../hooks/useAppNotifications';
+
+// Zomato-like Premium Map Style (Silver/Clean)
+const mapStyles = [
+  { "elementType": "geometry", "stylers": [{ "color": "#f5f5f5" }] },
+  { "elementType": "labels.icon", "stylers": [{ "visibility": "off" }] },
+  { "elementType": "labels.text.fill", "stylers": [{ "color": "#616161" }] },
+  { "elementType": "labels.text.stroke", "stylers": [{ "color": "#f5f5f5" }] },
+  { "featureType": "administrative.land_parcel", "elementType": "labels.text.fill", "stylers": [{ "color": "#bdbdbd" }] },
+  { "featureType": "poi", "elementType": "geometry", "stylers": [{ "color": "#eeeeee" }] },
+  { "featureType": "poi", "elementType": "labels.text.fill", "stylers": [{ "color": "#757575" }] },
+  { "featureType": "poi.park", "elementType": "geometry", "stylers": [{ "color": "#e5e5e5" }] },
+  { "featureType": "road", "elementType": "geometry", "stylers": [{ "color": "#ffffff" }] },
+  { "featureType": "road.arterial", "elementType": "labels.text.fill", "stylers": [{ "color": "#757575" }] },
+  { "featureType": "road.highway", "elementType": "geometry", "stylers": [{ "color": "#dadada" }] },
+  { "featureType": "road.highway", "elementType": "labels.text.fill", "stylers": [{ "color": "#616161" }] },
+  { "featureType": "road.local", "elementType": "labels.text.fill", "stylers": [{ "color": "#9e9e9e" }] },
+  { "featureType": "transit.line", "elementType": "geometry", "stylers": [{ "color": "#e5e5e5" }] },
+  { "featureType": "transit.station", "elementType": "geometry", "stylers": [{ "color": "#eeeeee" }] },
+  { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#c9c9c9" }] },
+  { "featureType": "water", "elementType": "labels.text.fill", "stylers": [{ "color": "#9e9e9e" }] }
+];
+
+const defaultCenter = { lat: 20.5937, lng: 78.9629 };
+const libraries = ['places', 'geometry'];
+
+const BookingTrack = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [booking, setBooking] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [coords, setCoords] = useState(null);
+  const [map, setMap] = useState(null);
+  const [currentLocation, setCurrentLocation] = useState(null); // Rider Location
+  const [directions, setDirections] = useState(null);
+  const [distance, setDistance] = useState('');
+  const [duration, setDuration] = useState('');
+  const [routePath, setRoutePath] = useState([]);
+  const [isAutoCenter, setIsAutoCenter] = useState(true);
+  const [isNavigationMode, setIsNavigationMode] = useState(false);
+
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+
+  const socket = useAppNotifications('user'); // Get socket
+
+  // ... existing state ... 
+
+  // Listen for Live Location Updates via Socket.IO
+  useEffect(() => {
+    if (socket && id) {
+      // Join the specific booking room for tracking
+      socket.emit('join_tracking', id);
+
+      const handleLocationUpdate = (data) => {
+        if (data.lat && data.lng) {
+          setCurrentLocation({ lat: parseFloat(data.lat), lng: parseFloat(data.lng) });
+        }
+      };
+
+      socket.on('live_location_update', handleLocationUpdate);
+
+      return () => {
+        socket.off('live_location_update', handleLocationUpdate);
+      };
+    }
+  }, [socket, id]);
+
+  const { isLoaded } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: apiKey,
+    libraries
+  });
+
+  // Load Booking Data & Poll for Location (Fallback & Status Check)
+  useEffect(() => {
+    let intervalId;
+
+    const fetchBooking = async (isFirstLoad = false) => {
+      try {
+        const response = await bookingService.getById(id);
+        if (response.success) {
+          setBooking(response.data);
+
+          if (isFirstLoad) {
+            const geocoder = new window.google.maps.Geocoder();
+
+            // 1. Destination: Fixed Booking Address from DB
+            const bAddr = response.data.address || {};
+            if (bAddr.lat && bAddr.lng) {
+              setCoords({ lat: parseFloat(bAddr.lat), lng: parseFloat(bAddr.lng) });
+            } else {
+              const addressStr = typeof bAddr === 'string' ? bAddr : `${bAddr.addressLine1 || ''}, ${bAddr.city || ''}, ${bAddr.state || ''} ${bAddr.pincode || ''}`;
+              if (addressStr.replaceAll(',', '').trim() && !addressStr.toLowerCase().includes('current location')) {
+                geocoder.geocode({ address: addressStr }, (results, status) => {
+                  if (status === 'OK' && results[0]) {
+                    setCoords(results[0].geometry.location.toJSON());
+                  }
+                });
+              }
+            }
+
+            // 2. Source: Live Provider Location (Initial set)
+            const provider = response.data.workerId || response.data.vendorId || response.data.assignedTo || {};
+
+            // Prioritize live location field
+            if (provider.location && provider.location.lat && provider.location.lng) {
+              const startLoc = { lat: parseFloat(provider.location.lat), lng: parseFloat(provider.location.lng) };
+              setCurrentLocation(startLoc);
+            }
+            // Only fallback to address for VENDORS (who have a fixed shop/store with lat/lng)
+            // WORKERS' address field usually doesn't have coordinates
+            else if (response.data.vendorId && provider.address && provider.address.lat && provider.address.lng) {
+              const addrLoc = { lat: parseFloat(provider.address.lat), lng: parseFloat(provider.address.lng) };
+
+              // Check if the vendor's address is within a reasonable distance (e.g., 100km)
+              // to avoid showing a provider far away if live location isn't available yet.
+              if (coords && window.google.maps.geometry) {
+                const distanceToDestination = window.google.maps.geometry.spherical.computeDistanceBetween(
+                  new window.google.maps.LatLng(addrLoc),
+                  new window.google.maps.LatLng(coords)
+                );
+                if (distanceToDestination < 100000) { // 100,000 meters = 100 km
+                  setCurrentLocation(addrLoc);
+                } else {
+                  console.warn("Vendor's address is too far from destination, waiting for live location.");
+                }
+              }
+              // Removed the unsafe else that bypassed the distance check
+            }
+          }
+        }
+      } catch (error) {
+      } finally {
+        if (isFirstLoad) setLoading(false);
+      }
+    };
+
+    if (isLoaded) {
+      fetchBooking(true);
+      intervalId = setInterval(() => fetchBooking(false), 10000);
+    }
+
+    return () => clearInterval(intervalId);
+  }, [id, isLoaded]);
+
+  const [heading, setHeading] = useState(0);
+  const prevLocationRef = useRef(null);
+  const lastRouteOriginRef = useRef(null);
+
+  // Calculate Heading based on movement (Direction Sense)
+  useEffect(() => {
+    if (isLoaded && currentLocation && window.google) {
+      if (prevLocationRef.current) {
+        const start = new window.google.maps.LatLng(prevLocationRef.current);
+        const end = new window.google.maps.LatLng(currentLocation);
+        const distanceMoved = window.google.maps.geometry.spherical.computeDistanceBetween(start, end);
+
+        // Update heading only if movement is significant (> 2 meters) to prevent jitter
+        if (distanceMoved > 2) {
+          const newHeading = window.google.maps.geometry.spherical.computeHeading(start, end);
+          setHeading(newHeading);
+        }
+      } else if (coords) {
+        // Initial heading towards destination
+        const start = new window.google.maps.LatLng(currentLocation);
+        const end = new window.google.maps.LatLng(coords);
+        setHeading(window.google.maps.geometry.spherical.computeHeading(start, end));
+      }
+      prevLocationRef.current = currentLocation;
+    }
+  }, [currentLocation, isLoaded, coords]);
+
+  // Sync Map Heading & Tilt for Navigation Feel
+  useEffect(() => {
+    if (map && currentLocation && heading && isAutoCenter) {
+      map.setHeading(heading);
+      map.setTilt(45); // 45 degree tilt for 3D feel
+    }
+  }, [map, heading, isAutoCenter, currentLocation]);
+
+  // Simulate Rider Location (Since we don't have real rider GPS stream yet for User App)
+  // Ideally this would come from a websocket or Firebase subscription
+  // Fallback: Set initial position to allow route calculation
+  /* 
+  // Simulation Removed: Waiting for Real Backend Location Updates
+  // Ideally, use a WebSocket or periodic fetch here to update `currentLocation`
+  // with the real rider's GPS coordinates.
+  */
+
+  // Calculate Route & Adjust Bounds
+  useEffect(() => {
+    if (isLoaded && currentLocation && coords && map) {
+
+      // Calculate or Recalculate directions if:
+      // 1. Directions haven't been calculated yet
+      // 2. Worker has moved significant distance (> 500m) from previous route origin
+
+      let shouldCalculate = !directions;
+
+      if (directions && lastRouteOriginRef.current) {
+        const distFromLastOrigin = window.google.maps.geometry.spherical.computeDistanceBetween(
+          new window.google.maps.LatLng(currentLocation),
+          new window.google.maps.LatLng(lastRouteOriginRef.current)
+        );
+        if (distFromLastOrigin > 500) { // Recalculate if moved > 500m
+          shouldCalculate = true;
+        }
+      }
+
+      if (shouldCalculate) {
+        const directionsService = new window.google.maps.DirectionsService();
+        directionsService.route(
+          {
+            origin: currentLocation,
+            destination: coords,
+            travelMode: window.google.maps.TravelMode.DRIVING,
+          },
+          (result, status) => {
+            if (status === window.google.maps.DirectionsStatus.OK) {
+              setDirections(result);
+              lastRouteOriginRef.current = currentLocation;
+              const leg = result.routes[0].legs[0];
+              setDistance(leg.distance.text);
+              setDuration(leg.duration.text);
+              setRoutePath(result.routes[0].overview_path);
+
+              // Only fitBounds on initial load to show full route
+              // Subsequent movements will use panTo to preserve rotation
+              if (isAutoCenter) {
+                map.fitBounds(result.routes[0].bounds);
+              }
+            }
+          }
+        );
+      } else if (isAutoCenter) {
+        if (isNavigationMode && heading) {
+          map.panTo(currentLocation);
+          map.setZoom(18);
+          map.setTilt(45);
+          map.setHeading(heading);
+        } else {
+          map.panTo(currentLocation);
+        }
+      }
+    }
+  }, [isLoaded, coords, map, currentLocation, isAutoCenter, isNavigationMode, heading]);
+
+  const mapOptions = useMemo(() => ({
+    disableDefaultUI: true,
+    zoomControl: false,
+    mapTypeId: 'roadmap',
+    gestureHandling: 'greedy',
+    rotateControl: true,
+    tiltControl: true,
+    isFractionalZoomEnabled: true,
+    mapTypeControl: false,
+    streetViewControl: false,
+    fullscreenControl: false,
+    mapId: '8e0a97af9386fefc',
+  }), []);
+
+  // Memoize Map Markers to prevent flickering/blinking
+  const destinationMarker = useMemo(() => coords && (
+    <OverlayView
+      position={coords}
+      mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+    >
+      <div className="relative -translate-x-1/2 -translate-y-[90%] pointer-events-none flex flex-col items-center">
+        <FiMapPin className="w-10 h-10 text-red-600 drop-shadow-xl fill-red-600 stroke-white stroke-[1.5px]" />
+        <div className="w-3 h-1 bg-black/20 rounded-full blur-[2px] mt-[-2px]"></div>
+      </div>
+    </OverlayView>
+  ), [coords]);
+
+  const riderMarker = useMemo(() => currentLocation && (
+    <OverlayView
+      position={currentLocation}
+      mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+    >
+      <div
+        style={{
+          position: 'absolute',
+          transform: 'translate(-50%, -50%)',
+          cursor: 'pointer'
+        }}
+        className="pointer-events-none"
+      >
+        <div
+          className="relative z-20 w-16 h-16 transition-transform duration-500 ease-in-out"
+          style={{ transform: `rotate(${heading}deg)` }}
+        >
+          <img
+            src="/rider-3D.png"
+            alt="Rider"
+            className="w-full h-full object-contain drop-shadow-xl"
+          />
+        </div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-teal-500/30 rounded-full animate-ping z-10 pointer-events-none"></div>
+        <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-12 h-3 bg-black/20 blur-sm rounded-full z-0"></div>
+      </div>
+    </OverlayView>
+  ), [currentLocation, heading]);
+
+  if (!isLoaded || loading) return <div className="h-screen bg-white flex items-center justify-center"><div className="w-8 h-8 border-4 border-teal-600 border-t-transparent rounded-full animate-spin"></div></div>;
+
+  return (
+    <div className="h-screen flex flex-col relative bg-white overflow-hidden">
+      {/* Top Floating Header */}
+      <div className="absolute top-4 left-4 right-4 z-10 flex justify-between items-start pointer-events-none">
+        <button
+          onClick={() => navigate(-1)}
+          className="pointer-events-auto bg-white/90 backdrop-blur-md p-3 rounded-full shadow-lg text-gray-700 hover:bg-white transition-all active:scale-95"
+        >
+          <FiArrowLeft className="w-6 h-6" />
+        </button>
+      </div>
+
+      <div className="flex-1 w-full h-full">
+        <GoogleMap
+          mapContainerStyle={{ width: '100%', height: '100%' }}
+          defaultCenter={defaultCenter}
+          defaultZoom={14}
+          onLoad={map => setMap(map)}
+          onDragStart={() => setIsAutoCenter(false)}
+          onZoomChanged={() => {
+            // Only disable if it's a programmatic zoom check is complicated, 
+            // but usually we want to stop auto-centering if user zooms.
+            // However, fitBounds triggers zoom changed. So we check user interaction.
+          }}
+          options={mapOptions}
+          onHeadingChanged={() => {
+            if (map && isAutoCenter) {
+              const h = map.getHeading();
+              if (Math.abs(h - heading) > 10) {
+                // User manually rotated more than 10 degrees
+                setIsAutoCenter(false);
+              }
+            }
+          }}
+          onTiltChanged={() => {
+            if (map && isAutoCenter) {
+              const t = map.getTilt();
+              if (t !== 45 && t !== 0) {
+                setIsAutoCenter(false);
+              }
+            }
+          }}
+        >
+          {directions && (
+            <>
+              <DirectionsRenderer
+                directions={directions}
+                options={{
+                  suppressMarkers: true,
+                  suppressPolylines: true
+                }}
+              />
+              <PolylineF
+                path={routePath}
+                options={{
+                  strokeColor: "#0F766E",
+                  strokeWeight: 8,
+                  strokeOpacity: 1,
+                  zIndex: 50
+                }}
+              />
+            </>
+          )}
+
+          {destinationMarker}
+          {riderMarker}
+        </GoogleMap>
+
+        {/* 3D / Rotate Button */}
+        <button
+          onClick={() => {
+            if (map) {
+              const currentTilt = map.getTilt();
+              if (currentTilt > 0 || isNavigationMode) {
+                // Switch to 2D
+                map.setTilt(0);
+                map.setHeading(0);
+                map.setZoom(14);
+                setIsNavigationMode(false);
+                toast("Switched to 2D Mode");
+              } else {
+                // Switch to 3D
+                map.setTilt(45);
+                setIsNavigationMode(true);
+                setIsAutoCenter(true);
+                toast.success("Switched to 3D Mode");
+              }
+            }
+          }}
+          className="absolute top-24 right-4 p-4 rounded-full shadow-2xl bg-white text-gray-700 z-50 active:scale-90 transition-all font-bold w-14 h-14 flex items-center justify-center border-2 border-gray-100"
+          style={{ boxShadow: '0 8px 30px rgba(0,0,0,0.2)' }}
+        >
+          <span className="text-sm font-black text-gray-800">{isNavigationMode ? '2D' : '3D'}</span>
+        </button>
+
+        {/* Floating Action Buttons */}
+        <div className="absolute bottom-32 right-4 flex flex-col gap-3 z-20">
+          <button
+            onClick={() => {
+              setIsAutoCenter(true);
+              if (map && currentLocation && coords) {
+                const bounds = new window.google.maps.LatLngBounds();
+                bounds.extend(currentLocation);
+                bounds.extend(coords);
+                map.fitBounds(bounds, { top: 100, bottom: 250, left: 50, right: 50 });
+              }
+            }}
+          >
+            <FiCrosshair className={`w-6 h-6 ${isAutoCenter ? 'animate-pulse' : ''}`} />
+          </button>
+        </div>
+
+        {/* Recenter Button */}
+
+      </div>
+
+      {/* Bottom Status Card */}
+      <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.12)] z-20 p-6 pb-8">
+        <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-6"></div>
+
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <p className="text-sm font-medium text-teal-600 mb-1 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-teal-600 animate-pulse"></span>
+              {duration ? `Arriving in ${duration}` : 'Calculating time...'}
+            </p>
+            <h2 className="text-2xl font-black text-gray-900 tracking-tight">On the way</h2>
+          </div>
+          {distance && (
+            <div className="text-right">
+              <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Distance</p>
+              <p className="text-xl font-bold text-gray-800">
+                {distance}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Address Info */}
+        <div className="bg-gray-50 rounded-2xl p-4 flex items-start gap-4 mb-4 border border-gray-100">
+          <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-md text-teal-600 border border-gray-100 shrink-0">
+            <FiMapPin className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-bold text-gray-900 mb-0.5">Your Location</h3>
+            <p className="text-sm text-gray-500 line-clamp-2 leading-relaxed">
+              {(() => {
+                const addr = booking?.address;
+                if (!addr) return 'Loading destination...';
+                if (typeof addr === 'string') return addr;
+                return `${addr.addressLine1 || ''}, ${addr.city || ''} ${addr.pincode || ''}`;
+              })()}
+            </p>
+          </div>
+        </div>
+
+        {/* Agent Info (Mock) */}
+        <div className="bg-gray-50 rounded-2xl p-4 flex items-center gap-4 mb-4 border border-gray-100">
+          <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center border-2 border-white shadow-md overflow-hidden">
+            {/* Ideally fetch worker photo */}
+            <img src="https://ui-avatars.com/api/?name=Service+Agent&background=0d9488&color=fff" alt="Agent" className="w-full h-full" />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-bold text-gray-900 line-clamp-1">{booking?.assignedTo?.name || 'Service Partner'}</h3>
+            <p className="text-xs text-gray-500">Verified Professional</p>
+          </div>
+
+          {/* Call Button */}
+          {(booking?.assignedTo?.phone || booking?.vendorPhone) && (
+            <a href={`tel:${booking.assignedTo?.phone || booking.vendorPhone}`} className="w-10 h-10 bg-green-100 text-green-700 rounded-full flex items-center justify-center active:scale-90 transition-transform">
+              <FiPhone className="w-5 h-5" />
+            </a>
+          )}
+        </div>
+
+      </div>
+    </div>
+  );
+};
+
+export default BookingTrack;

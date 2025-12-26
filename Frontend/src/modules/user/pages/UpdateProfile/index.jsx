@@ -1,0 +1,259 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { FiArrowLeft, FiUser, FiMail, FiPhone } from 'react-icons/fi';
+import { toast } from 'react-hot-toast';
+import { themeColors } from '../../../../theme';
+import { userAuthService } from '../../../../services/authService';
+
+const UpdateProfile = () => {
+  const navigate = useNavigate();
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Fetch user profile on component mount
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        // First check localStorage
+        const storedUserData = localStorage.getItem('userData');
+        if (storedUserData) {
+          const userData = JSON.parse(storedUserData);
+          setFormData({
+            name: userData.name || '',
+            email: userData.email || '',
+            phone: userData.phone || '',
+          });
+        }
+
+        // Fetch fresh data from API
+        const response = await userAuthService.getProfile();
+        if (response.success && response.user) {
+          setFormData({
+            name: response.user.name || '',
+            email: response.user.email || '',
+            phone: response.user.phone || '',
+          });
+        }
+      } catch (error) {
+        // Use localStorage data if API fails
+        const storedUserData = localStorage.getItem('userData');
+        if (storedUserData) {
+          const userData = JSON.parse(storedUserData);
+          setFormData({
+            name: userData.name || '',
+            email: userData.email || '',
+            phone: userData.phone || '',
+          });
+        } else {
+          toast.error('Failed to load profile data');
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, []);
+
+  // Format phone number for display
+  const formatPhoneNumber = (phone) => {
+    if (!phone) return '';
+    if (phone.startsWith('+91')) return phone;
+    if (phone.length === 10) return `+91 ${phone}`;
+    return phone;
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSave = async () => {
+    // Validation
+    if (!formData.name || formData.name.trim().length < 2) {
+      toast.error('Please enter a valid name (at least 2 characters)');
+      return;
+    }
+
+    if (formData.email && !formData.email.includes('@')) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const response = await userAuthService.updateProfile({
+        name: formData.name.trim(),
+        email: formData.email.trim() || null
+      });
+
+      if (response.success) {
+        toast.success('Profile updated successfully!');
+        navigate('/user/account');
+      } else {
+        toast.error(response.message || 'Failed to update profile');
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to update profile. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleBack = () => {
+    navigate('/user/account');
+  };
+
+  return (
+    <div className="min-h-screen bg-white pb-20">
+      {/* Header */}
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
+        <div className="px-4 pt-4 pb-3">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleBack}
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            >
+              <FiArrowLeft className="w-5 h-5 text-black" />
+            </button>
+            <h1 className="text-xl font-bold text-black">Update Profile</h1>
+          </div>
+        </div>
+      </header>
+
+      <main className="px-4 py-4">
+        {/* Profile Form */}
+        <div className="space-y-4">
+          {/* Full Name */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Full Name
+            </label>
+            <div className="relative">
+              <div
+                className="absolute left-3 top-1/2 transform -translate-y-1/2"
+                style={{ color: themeColors.button }}
+              >
+                <FiUser className="w-5 h-5" />
+              </div>
+              <input
+                type="text"
+                name="name"
+                value={formData.name}
+                onChange={handleInputChange}
+                disabled={isLoading}
+                className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:border-transparent transition-all"
+                style={{
+                  focusRingColor: themeColors.button,
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = themeColors.button;
+                  e.target.style.boxShadow = '0 0 0 3px rgba(0, 166, 166, 0.1)';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = '#d1d5db';
+                  e.target.style.boxShadow = 'none';
+                }}
+                placeholder="Enter your full name"
+              />
+            </div>
+          </div>
+
+          {/* Email Address */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Email Address
+            </label>
+            <div className="relative">
+              <div
+                className="absolute left-3 top-1/2 transform -translate-y-1/2"
+                style={{ color: themeColors.button }}
+              >
+                <FiMail className="w-5 h-5" />
+              </div>
+              <input
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleInputChange}
+                disabled={isLoading}
+                className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:border-transparent transition-all"
+                onFocus={(e) => {
+                  e.target.style.borderColor = themeColors.button;
+                  e.target.style.boxShadow = '0 0 0 3px rgba(0, 166, 166, 0.1)';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = '#d1d5db';
+                  e.target.style.boxShadow = 'none';
+                }}
+                placeholder="Enter your email address"
+              />
+            </div>
+          </div>
+
+          {/* Phone Number */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Phone Number
+            </label>
+            <div className="relative">
+              <div
+                className="absolute left-3 top-1/2 transform -translate-y-1/2"
+                style={{ color: themeColors.button }}
+              >
+                <FiPhone className="w-5 h-5" />
+              </div>
+              <input
+                type="tel"
+                name="phone"
+                value={formatPhoneNumber(formData.phone)}
+                disabled
+                className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-300 bg-gray-50 text-gray-600 cursor-not-allowed"
+                placeholder="Phone number cannot be changed"
+              />
+              <p className="text-xs text-gray-500 mt-1 ml-1">
+                Phone number cannot be changed for security reasons
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Save Button */}
+        <div className="mt-6">
+          <button
+            onClick={handleSave}
+            disabled={isLoading || isSaving}
+            className="w-full text-white font-bold py-3.5 rounded-xl active:scale-98 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              background: `linear-gradient(135deg, ${themeColors.button} 0%, ${themeColors.icon} 100%)`,
+              boxShadow: '0 4px 12px rgba(0, 166, 166, 0.4)',
+            }}
+            onMouseEnter={(e) => {
+              if (!isLoading && !isSaving) {
+                e.target.style.boxShadow = '0 6px 16px rgba(0, 166, 166, 0.5)';
+                e.target.style.transform = 'translateY(-1px)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.boxShadow = '0 4px 12px rgba(0, 166, 166, 0.4)';
+              e.target.style.transform = 'translateY(0)';
+            }}
+          >
+            {isSaving ? 'Saving...' : 'Save Changes'}
+          </button>
+        </div>
+      </main>
+    </div>
+  );
+};
+
+export default UpdateProfile;
+
