@@ -159,22 +159,26 @@ export const handleLogout = (role = null) => {
     localStorage.removeItem('vendorAccessToken');
     localStorage.removeItem('vendorRefreshToken');
     localStorage.removeItem('vendorData');
-    window.location.href = '/vendor/login';
+    // window.location.href = '/vendor/login';
+    console.log('Vendor logout suppressed');
   } else if (role === 'worker') {
     localStorage.removeItem('workerAccessToken');
     localStorage.removeItem('workerRefreshToken');
     localStorage.removeItem('workerData');
-    window.location.href = '/worker/login';
+    // window.location.href = '/worker/login';
+    console.log('Worker logout suppressed');
   } else if (role === 'admin') {
     localStorage.removeItem('adminAccessToken');
     localStorage.removeItem('adminRefreshToken');
     localStorage.removeItem('adminData');
-    window.location.href = '/admin/login';
+    // window.location.href = '/admin/login';
+    console.log('Admin logout suppressed');
   } else {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('userData');
-    window.location.href = '/user/login';
+    // window.location.href = '/user/login';
+    console.log('Logout suppressed for dev bypass');
   }
 };
 
