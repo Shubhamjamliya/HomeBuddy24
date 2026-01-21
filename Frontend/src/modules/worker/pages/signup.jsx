@@ -1,0 +1,472 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
+import { FiUser, FiMail, FiPhone, FiFileText, FiUpload, FiX, FiArrowRight, FiChevronLeft, FiCheckCircle } from 'react-icons/fi';
+import { toast } from 'react-hot-toast';
+import { themeColors } from '../../../theme';
+import { workerAuthService } from '../../../services/authService';
+import Logo from '../../../components/common/Logo';
+
+const WorkerSignup = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [step, setStep] = useState('details'); // 'details' or 'otp'
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phoneNumber: '',
+    aadhar: '',
+    aadharDocument: null
+  });
+  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [otpToken, setOtpToken] = useState('');
+  const [verificationToken, setVerificationToken] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [documentPreview, setDocumentPreview] = useState(null);
+
+  // Refs for auto-focus
+  const nameInputRef = useRef(null);
+  const otpInputRefs = useRef([]);
+
+  // Pre-fill from navigation state (Unified Flow)
+  useEffect(() => {
+    if (location.state?.phone && location.state?.verificationToken) {
+      setFormData(prev => ({ ...prev, phoneNumber: location.state.phone }));
+      setVerificationToken(location.state.verificationToken);
+    }
+  }, [location.state]);
+
+  // Clear any existing worker tokens on page load
+  useEffect(() => {
+    localStorage.removeItem('workerAccessToken');
+    localStorage.removeItem('workerRefreshToken');
+    localStorage.removeItem('workerData');
+  }, []);
+
+  // Auto-focus logic
+  useEffect(() => {
+    if (step === 'details' && nameInputRef.current) {
+      setTimeout(() => nameInputRef.current.focus(), 100);
+    } else if (step === 'otp' && otpInputRefs.current[0]) {
+      setTimeout(() => otpInputRefs.current[0].focus(), 100);
+    }
+  }, [step]);
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleDocumentUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp', 'image/gif', 'application/pdf'];
+    if (!validTypes.includes(file.type)) {
+      toast.error('Please upload a valid image or PDF');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File size should be less than 5MB');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setFormData(prev => ({
+        ...prev,
+        aadharDocument: file
+      }));
+      setDocumentPreview(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeDocument = () => {
+    setFormData(prev => ({
+      ...prev,
+      aadharDocument: null
+    }));
+    setDocumentPreview(null);
+  };
+
+  // Validation helpers
+  const validateName = (name) => {
+    if (!name || !name.trim()) return 'Name is required';
+    if (name.trim().length < 2) return 'Name must be at least 2 characters';
+    if (!/^[a-zA-Z\s]+$/.test(name.trim())) return 'Name can only contain letters and spaces';
+    return null;
+  };
+
+  const validateEmail = (email) => {
+    if (!email || !email.trim()) return 'Email is required';
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) return 'Please enter a valid email address';
+    return null;
+  };
+
+  const validatePhone = (phone) => {
+    if (!phone) return 'Phone number is required';
+    if (phone.length !== 10) return 'Phone number must be exactly 10 digits';
+    if (!/^[6-9]\d{9}$/.test(phone)) return 'Please enter a valid Indian phone number';
+    return null;
+  };
+
+  const validateAadhar = (aadhar) => {
+    if (!aadhar) return 'Aadhar number is required';
+    if (aadhar.length !== 12) return 'Aadhar number must be exactly 12 digits';
+    if (!/^\d{12}$/.test(aadhar)) return 'Aadhar number can only contain digits';
+    return null;
+  };
+
+  const validateForm = () => {
+    const errors = [];
+    errors.push(validateName(formData.name));
+    errors.push(validateEmail(formData.email));
+    errors.push(validatePhone(formData.phoneNumber));
+    errors.push(validateAadhar(formData.aadhar));
+    if (!formData.aadharDocument) errors.push('Please upload Aadhar document');
+
+    return errors.filter(e => e !== null);
+  };
+
+  const handleDetailsSubmit = async (e) => {
+    e.preventDefault();
+
+    const errors = validateForm();
+    if (errors.length > 0) {
+      errors.forEach(err => toast.error(err));
+      return;
+    }
+
+    setIsLoading(true);
+
+    if (verificationToken) {
+      try {
+        const aadharDoc = documentPreview || null;
+        const registerData = {
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phoneNumber,
+          aadhar: formData.aadhar,
+          aadharDocument: aadharDoc,
+          verificationToken
+        };
+
+        const response = await workerAuthService.register(registerData);
+        if (response.success) {
+          toast.success(
+            <div className="flex flex-col">
+              <span className="font-bold">Welcome Onboard!</span>
+              <span className="text-xs">Your worker account has been created.</span>
+            </div>,
+            { icon: <FiCheckCircle className="text-green-500" /> }
+          );
+          navigate('/worker');
+        } else {
+          toast.error(response.message || 'Registration failed');
+        }
+      } catch (error) {
+        toast.error(error.response?.data?.message || 'Registration failed');
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    try {
+      const response = await workerAuthService.sendOTP(formData.phoneNumber, formData.email);
+      if (response.success) {
+        setOtpToken(response.token);
+        setIsLoading(false);
+        setStep('otp');
+        toast.success('OTP sent successfully');
+      } else {
+        setIsLoading(false);
+        toast.error(response.message || 'Failed to send OTP');
+      }
+    } catch (error) {
+      setIsLoading(false);
+      toast.error(error.response?.data?.message || 'Failed to send OTP');
+    }
+  };
+
+  const handleOtpChange = (index, value) => {
+    const cleanValue = value.replace(/\D/g, '').slice(0, 1);
+    const newOtp = [...otp];
+    newOtp[index] = cleanValue;
+    setOtp(newOtp);
+
+    if (cleanValue && index < 5) {
+      otpInputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (index, e) => {
+    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+      otpInputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleOtpSubmit = async (e) => {
+    e.preventDefault();
+    const otpValue = otp.join('');
+    if (otpValue.length !== 6) {
+      toast.error('Please enter complete OTP');
+      return;
+    }
+    if (!otpToken) {
+      toast.error('Please request OTP first');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const aadharDoc = documentPreview || null;
+      const registerData = {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phoneNumber,
+        aadhar: formData.aadhar,
+        aadharDocument: aadharDoc,
+        otp: otpValue,
+        token: otpToken
+      };
+
+      const response = await workerAuthService.register(registerData);
+      if (response.success) {
+        setIsLoading(false);
+        toast.success('Registration successful! Welcome to Homster.');
+        navigate('/worker');
+      } else {
+        setIsLoading(false);
+        toast.error(response.message || 'Registration failed');
+      }
+    } catch (error) {
+      setIsLoading(false);
+      toast.error(error.response?.data?.message || 'Registration failed');
+    }
+  };
+
+  const brandColor = themeColors.brand?.teal || '#347989';
+
+  return (
+    <div className="min-h-[100dvh] bg-gray-50 flex flex-col justify-start sm:justify-center py-12 sm:px-6 lg:px-8 relative overflow-y-auto overflow-x-hidden">
+      {/* Decorative Background Elements */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-[#347989] opacity-[0.03] rounded-full blur-3xl animate-floating" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-[#D68F35] opacity-[0.03] rounded-full blur-3xl animate-floating" style={{ animationDelay: '2s' }} />
+
+      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center mb-8 relative z-10 animate-fade-in">
+        <Logo className="h-16 w-auto mx-auto transform hover:scale-110 transition-transform duration-500" />
+        <h2 className="mt-4 text-3xl font-extrabold text-gray-900 tracking-tight">
+          {step === 'details' ? 'Xpert Registration' : 'Confirm Phone'}
+        </h2>
+        <p className="mt-2 text-sm text-gray-600 animate-stagger-1 animate-fade-in">
+          Join the pros. Set your schedule, earn more.
+        </p>
+      </div>
+
+      <div className="sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0 relative z-10">
+        <div className="bg-white py-8 px-4 shadow-2xl shadow-gray-200/50 sm:rounded-2xl sm:px-10 border border-gray-100 relative overflow-hidden animate-slide-in-bottom">
+          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#347989] via-[#D68F35] to-[#BB5F36]" />
+
+          {step === 'details' ? (
+            <form onSubmit={handleDetailsSubmit} className="space-y-6">
+              <div className="animate-stagger-1 animate-fade-in">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                <div className="relative rounded-xl shadow-sm group">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none group-focus-within:text-[#347989] transition-colors">
+                    <FiUser className="text-gray-400" />
+                  </div>
+                  <input
+                    ref={nameInputRef}
+                    type="text"
+                    name="name"
+                    required
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    className="block w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-offset-2 outline-none transition-all duration-300 hover:border-gray-400"
+                    style={{ '--tw-ring-color': brandColor }}
+                    placeholder="Enter your name"
+                  />
+                </div>
+              </div>
+
+              <div className="animate-stagger-2 animate-fade-in">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <div className="relative rounded-xl shadow-sm group">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none group-focus-within:text-[#347989] transition-colors">
+                    <FiMail className="text-gray-400" />
+                  </div>
+                  <input
+                    type="email"
+                    name="email"
+                    required
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    className="block w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-offset-2 outline-none transition-all duration-300 hover:border-gray-400"
+                    style={{ '--tw-ring-color': brandColor }}
+                    placeholder="name@example.com"
+                  />
+                </div>
+              </div>
+
+              {!verificationToken && (
+                <div className="animate-stagger-3 animate-fade-in">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                  <div className="relative rounded-xl shadow-sm group">
+                    <div className="absolute inset-y-0 left-0 pl-3 border-r pr-2 flex items-center pointer-events-none group-focus-within:text-[#347989] transition-colors">
+                      <span className="text-gray-500 font-bold text-sm">+91</span>
+                    </div>
+                    <input
+                      type="tel"
+                      required
+                      value={formData.phoneNumber}
+                      onChange={(e) => setFormData(p => ({ ...p, phoneNumber: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
+                      className="block w-full pl-14 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-offset-2 outline-none transition-all duration-300 hover:border-gray-400"
+                      style={{ '--tw-ring-color': brandColor }}
+                      placeholder="9876543210"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="animate-stagger-4 animate-fade-in">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Aadhar Number</label>
+                <div className="relative rounded-xl shadow-sm group">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none group-focus-within:text-[#347989] transition-colors">
+                    <FiFileText className="text-gray-400" />
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={formData.aadhar}
+                    onChange={(e) => setFormData(p => ({ ...p, aadhar: e.target.value.replace(/\D/g, '').slice(0, 12) }))}
+                    className="block w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-offset-2 outline-none transition-all duration-300 hover:border-gray-400"
+                    style={{ '--tw-ring-color': brandColor }}
+                    placeholder="12-digit Aadhar"
+                  />
+                </div>
+              </div>
+
+              {/* Aadhar Upload */}
+              <div className="animate-stagger-5 animate-fade-in">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Aadhar Document</label>
+                {documentPreview ? (
+                  <div className="relative group overflow-hidden rounded-xl">
+                    <img src={documentPreview} className="w-full h-32 object-cover border transform group-hover:scale-110 transition-transform duration-500" />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <button type="button" onClick={removeDocument} className="bg-red-500 text-white rounded-full p-2 shadow-xl hover:bg-red-600 transition-colors">
+                        <FiX size={20} />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 transition-all duration-300 hover:border-[#347989] group">
+                    <FiUpload className="w-8 h-8 text-gray-400 mb-2 group-hover:text-[#347989] group-hover:-translate-y-1 transition-all" />
+                    <span className="text-sm text-gray-500 font-medium">Click to upload Aadhar</span>
+                    <input type="file" className="hidden" accept="image/*,.pdf" onChange={handleDocumentUpload} />
+                  </label>
+                )}
+              </div>
+
+              <div className="animate-stagger-[6] animate-fade-in">
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="group relative w-full flex justify-center py-4 px-4 border border-transparent text-base font-bold rounded-xl text-white transition-all transform hover:-translate-y-1 shadow-lg disabled:opacity-50 overflow-hidden"
+                  style={{ backgroundColor: brandColor, boxShadow: `0 10px 15px -3px ${brandColor}4D` }}
+                >
+                  <span className="absolute inset-0 w-full h-full bg-white/10 group-hover:translate-x-full transition-transform duration-700 -translate-x-full" />
+                  {isLoading ? 'Processing...' : (
+                    <span className="flex items-center relative z-10">
+                      {verificationToken ? 'Finish Registration' : 'Verify & Join'}
+                      <FiArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" />
+                    </span>
+                  )}
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="space-y-6">
+              <button
+                onClick={() => setStep('details')}
+                className="flex items-center text-sm text-gray-500 hover:text-[#347989] transition-colors mb-4 animate-fade-in"
+              >
+                <FiChevronLeft className="mr-1" /> Edit details
+              </button>
+
+              <div className="text-center animate-fade-in">
+                <h3 className="text-xl font-bold text-gray-900">Enter OTP</h3>
+                <p className="text-sm text-gray-600">Waiting for 6-digit code...</p>
+              </div>
+
+              <form onSubmit={handleOtpSubmit} className="space-y-8">
+                <div className="flex justify-between gap-2 animate-stagger-1 animate-fade-in">
+                  {otp.map((digit, index) => (
+                    <input
+                      key={index}
+                      ref={(el) => (otpInputRefs.current[index] = el)}
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={1}
+                      value={digit}
+                      onChange={(e) => handleOtpChange(index, e.target.value)}
+                      onKeyDown={(e) => handleOtpKeyDown(index, e)}
+                      className="w-full h-14 text-center text-xl font-bold border border-gray-300 rounded-xl focus:ring-2 focus:ring-offset-2 outline-none transition-all duration-300 hover:border-gray-400"
+                      style={{ '--tw-ring-color': brandColor, backgroundColor: digit ? `${brandColor}05` : 'white' }}
+                    />
+                  ))}
+                </div>
+
+                <div className="text-center animate-stagger-2 animate-fade-in">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const response = await workerAuthService.sendOTP(formData.phoneNumber, formData.email);
+                        if (response.success) {
+                          setOtpToken(response.token);
+                          toast.success('OTP sent again');
+                        }
+                      } catch (e) { toast.error('Resend failed'); }
+                    }}
+                    className="text-sm font-semibold transition-colors duration-300 opacity-70 hover:opacity-100"
+                    style={{ color: brandColor }}
+                  >
+                    Resend Code
+                  </button>
+                </div>
+
+                <div className="animate-stagger-3 animate-fade-in">
+                  <button
+                    type="submit"
+                    disabled={isLoading || otp.join('').length !== 6}
+                    className="group relative w-full py-4 rounded-xl text-white font-bold transform hover:-translate-y-1 transition-all shadow-lg disabled:opacity-50 overflow-hidden"
+                    style={{ backgroundColor: brandColor, boxShadow: `0 10px 15px -3px ${brandColor}4D` }}
+                  >
+                    <span className="absolute inset-0 w-full h-full bg-white/10 group-hover:translate-x-full transition-transform duration-700 -translate-x-full" />
+                    <span className="relative z-10">
+                      {isLoading ? 'Verifying...' : 'Complete Sign Up'}
+                    </span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+        </div>
+
+        <p className="mt-8 text-center text-sm text-gray-500 animate-fade-in animate-stagger-4">
+          Already an Xpert?{' '}
+          <Link to="/worker/login" className="font-semibold hover:text-[#D68F35] transition-colors" style={{ color: brandColor }}>
+            Sign In
+          </Link>
+        </p>
+      </div>
+    </div>
+  );
+};
+
+export default WorkerSignup;
