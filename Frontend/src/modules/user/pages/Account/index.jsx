@@ -115,7 +115,7 @@ const Account = () => {
     { id: 6, label: 'Manage payment methods', icon: FiCreditCard },
     { id: 7, label: 'Settings', icon: FiSettings },
     { id: 9, label: 'Help & Support', icon: FiHeadphones },
-    { id: 8, label: 'About Homster', icon: null, customIcon: 'Homster' },
+    { id: 8, label: 'About HomeBuddy', icon: null, customIcon: 'HomeBuddy' },
   ];
 
   const handleCardClick = (cardType) => {
@@ -144,8 +144,8 @@ const Account = () => {
       navigate('/user/my-rating');
     } else if (item.label === 'Help & Support') {
       navigate('/user/help-support');
-    } else if (item.label === 'About Homster') {
-      navigate('/user/about-homster');
+    } else if (item.label === 'About HomeBuddy') {
+      navigate('/user/about-homebuddy');
     }
     // Navigate to respective page
   };

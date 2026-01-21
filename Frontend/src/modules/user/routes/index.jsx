@@ -90,7 +90,7 @@ const UserRoutes = () => {
     '/user', '/user/', '/user/rewards', '/user/account', '/user/native', '/user/cart',
     '/user/checkout', '/user/my-bookings', '/user/settings', '/user/manage-payment-methods',
     '/user/manage-addresses', '/user/wallet', '/user/my-plan',
-    '/user/my-rating', '/user/about-homster', '/user/update-profile', '/user/scrap',
+    '/user/my-rating', '/user/about-homebuddy', '/user/update-profile', '/user/scrap',
     '/user/notifications', '/user/help-support'
   ];
   const isDynamicServicePage = !staticUserPaths.includes(location.pathname) &&
@@ -128,7 +128,7 @@ const UserRoutes = () => {
             <Route path="/wallet" element={<ProtectedRoute userType="user"><Wallet /></ProtectedRoute>} />
             <Route path="/my-plan" element={<ProtectedRoute userType="user"><MyPlan /></ProtectedRoute>} />
             <Route path="/my-rating" element={<ProtectedRoute userType="user"><MyRating /></ProtectedRoute>} />
-            <Route path="/about-homster" element={<ProtectedRoute userType="user"><AboutHomster /></ProtectedRoute>} />
+            <Route path="/about-homebuddy" element={<ProtectedRoute userType="user"><AboutHomster /></ProtectedRoute>} />
             <Route path="/update-profile" element={<ProtectedRoute userType="user"><UpdateProfile /></ProtectedRoute>} />
             <Route path="/scrap" element={<ProtectedRoute userType="user"><Scrap /></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute userType="user"><Notifications /></ProtectedRoute>} />

@@ -238,7 +238,7 @@ const WorkerSignup = () => {
       const response = await workerAuthService.register(registerData);
       if (response.success) {
         setIsLoading(false);
-        toast.success('Registration successful! Welcome to Homster.');
+        toast.success('Registration successful! Welcome to HomeBuddy.');
         navigate('/worker');
       } else {
         setIsLoading(false);

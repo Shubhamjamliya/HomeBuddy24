@@ -92,7 +92,7 @@ const AboutHomster = () => {
           >
             <FiArrowLeft className="w-5 h-5 text-gray-700" />
           </button>
-          <span className="text-xl font-bold" style={homsterTextGradient}>About Homster</span>
+          <span className="text-xl font-bold" style={homsterTextGradient}>About HomeBuddy</span>
         </div>
       </header>
 
@@ -115,7 +115,7 @@ const AboutHomster = () => {
           </div>
 
           <h1 className="text-3xl font-extrabold text-gray-900 mb-2">
-            Welcome to <span style={homsterTextGradient}>Homster</span>
+            Welcome to <span style={homsterTextGradient}>HomeBuddy</span>
           </h1>
           <p className="text-gray-500 max-w-xs mx-auto leading-relaxed">
             Your trusted partner for premium home and personal care services.
@@ -144,14 +144,14 @@ const AboutHomster = () => {
             </div>
             <h3 className="text-lg font-bold text-gray-800 mb-3">Our Mission</h3>
             <p className="text-sm text-gray-600 leading-relaxed relative z-10">
-              Homster is dedicated to revolutionizing how you experience home services. We connect you with top-tier professionals to deliver safe, reliable, and high-quality services right at your doorstep. We believe in making life simpler, one service at a time.
+              HomeBuddy is dedicated to revolutionizing how you experience home services. We connect you with top-tier professionals to deliver safe, reliable, and high-quality services right at your doorstep. We believe in making life simpler, one service at a time.
             </p>
           </div>
         </motion.div>
 
         {/* Why Choose Us Grid */}
         <motion.div variants={itemVariants}>
-          <h3 className="text-lg font-bold text-gray-800 mb-4 px-1">Why Choose Homster?</h3>
+          <h3 className="text-lg font-bold text-gray-800 mb-4 px-1">Why Choose HomeBuddy?</h3>
           <div className="grid grid-cols-2 gap-3">
             {features.map((feature, index) => (
               <div
@@ -195,7 +195,7 @@ const AboutHomster = () => {
         {/* Footer Info */}
         <motion.div variants={itemVariants} className="text-center pt-4 border-t border-gray-200">
           <p className="text-xs text-gray-400 mb-1">Designed & Developed by</p>
-          <span className="text-sm font-bold tracking-wide" style={homsterTextGradient}>Homster Team</span>
+          <span className="text-sm font-bold tracking-wide" style={homsterTextGradient}>HomeBuddy Team</span>
           <p className="text-[10px] text-gray-300 mt-4">v7.6.27 • Made with ❤️ in India</p>
         </motion.div>
       </main>

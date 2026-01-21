@@ -114,7 +114,7 @@ const VendorRoutes = () => {
             <Route path="/notifications" element={<ProtectedRoute userType="vendor"><Notifications /></ProtectedRoute>} />
             <Route path="/scrap" element={<ProtectedRoute userType="vendor"><Scrap /></ProtectedRoute>} />
             <Route path="/my-ratings" element={<ProtectedRoute userType="vendor"><MyRatings /></ProtectedRoute>} />
-            <Route path="/about-homster" element={<ProtectedRoute userType="vendor"><AboutHomster /></ProtectedRoute>} />
+            <Route path="/about-homebuddy" element={<ProtectedRoute userType="vendor"><AboutHomster /></ProtectedRoute>} />
           </Routes>
         </PageTransition>
       </Suspense>

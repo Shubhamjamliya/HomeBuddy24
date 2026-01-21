@@ -22,7 +22,7 @@ const LogoLoader = ({ fullScreen = true, size = "w-32 h-32" }) => {
         className={`relative ${size} flex items-center justify-center`}
       >
         <img
-          src="/Homster-logo.png"
+          src="/HomeBuddy-header-logo.png"
           alt="Loading..."
           className="w-full h-full object-contain"
         />
