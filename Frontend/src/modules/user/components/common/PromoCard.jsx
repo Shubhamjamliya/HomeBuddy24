@@ -1,46 +1,40 @@
 import React, { memo } from 'react';
 import { themeColors } from '../../../../theme';
-import OptimizedImage from '../../../../components/common/OptimizedImage';
-import OptimizedVideo from '../../../../components/common/OptimizedVideo';
+import { FiCalendar } from 'react-icons/fi';
 
-const PromoCard = memo(({ title, subtitle, buttonText, image, onClick, className = '' }) => {
-  const isVideo = image && (
-    image.includes('video/upload') ||
-    image.match(/\.(mp4|webm|ogg|mov)$|^https:\/\/res\.cloudinary\.com.*\/video\//i)
-  );
-
+const PromoCard = memo(({ title, subtitle, buttonText, image, onClick }) => {
   return (
     <div
-      className="relative rounded-2xl overflow-hidden min-w-[320px] md:min-w-[400px] h-48 md:h-56 cursor-pointer transition-all duration-300 hover:shadow-xl hover:scale-[1.02] active:scale-95"
-      style={{
-        boxShadow: themeColors.cardShadow,
-        border: themeColors.cardBorder,
-        backdropFilter: 'blur(10px)'
-      }}
+      className="relative rounded-[28px] overflow-hidden w-[calc(100vw-32px)] max-w-lg aspect-[2/1] min-h-[160px] cursor-pointer transition-all duration-300 hover:shadow-xl group"
       onClick={onClick}
     >
+      {/* Background Image / Gradient */}
       {image ? (
-        isVideo ? (
-          <OptimizedVideo
+        <div className="absolute inset-0">
+          <img
             src={image}
-            className="w-full h-full object-fill"
-            autoPlay
-            loop
-            muted
-            playsInline
+            alt={title}
+            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
           />
-        ) : (
-          <OptimizedImage
-            src={image}
-            alt={title || 'Promo'}
-            className="w-full h-full object-fill"
-          />
-        )
-      ) : (
-        <div className="w-full h-full flex items-center justify-center bg-gray-200">
-          <span className="text-gray-400 text-sm">Image</span>
+          {/* Overlay for text readability */}
+          <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/20 to-transparent" />
         </div>
+      ) : (
+        <div
+          className="absolute inset-0"
+          style={{ background: 'linear-gradient(135deg, #2874F0 0%, #1a56b9 100%)' }}
+        />
       )}
+
+      <div className="relative z-10 p-6 flex flex-col h-full justify-end items-start w-full">
+        {/* Button - Only element kept per user request */}
+        <button
+          className="px-6 py-2.5 bg-[#FACC15] text-gray-900 rounded-xl text-[14px] font-black shadow-lg shadow-black/20 hover:bg-yellow-300 transition-all active:scale-95 uppercase tracking-tight"
+          style={{ backgroundColor: '#FACC15' }}
+        >
+          Explore
+        </button>
+      </div>
     </div>
   );
 });

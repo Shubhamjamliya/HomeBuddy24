@@ -102,7 +102,7 @@ const MostBookedServices = React.memo(({ services, onServiceClick, onAddClick })
         </h2>
       </div>
 
-      <div ref={cardsRef} className="flex gap-2 overflow-x-auto px-6 pb-2 scrollbar-hide">
+      <div ref={cardsRef} className="grid grid-cols-1 gap-4 px-4 pb-2">
         {serviceList.map((service) => (
           <DetailedServiceCard
             key={service.id}

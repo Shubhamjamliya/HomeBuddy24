@@ -1,11 +1,6 @@
 import React from 'react';
 import CategoryCard from '../../../components/common/CategoryCard';
-import electricianIcon from '../../../../../assets/images/icons/services/electrician.png';
-import womensSalonIcon from '../../../../../assets/images/icons/services/womens-salon-spa-icon.png';
-import massageMenIcon from '../../../../../assets/images/icons/services/massage-men-icon.png';
-import cleaningIcon from '../../../../../assets/images/icons/services/cleaning-icon.png';
-import electricianPlumberIcon from '../../../../../assets/images/icons/services/electrician-plumber-carpenter-icon.png';
-import acApplianceRepairIcon from '../../../../../assets/images/icons/services/ac-appliance-repair-icon.png';
+import { FiGrid } from 'react-icons/fi';
 
 const toAssetUrl = (url) => {
   if (!url) return '';
@@ -16,54 +11,68 @@ const toAssetUrl = (url) => {
 };
 
 const ServiceCategories = React.memo(({ categories, onCategoryClick, onSeeAllClick }) => {
-
-
   if (!Array.isArray(categories) || categories.length === 0) {
     return null;
   }
 
-  const serviceCategories = categories.map((cat) => ({
-    ...cat,
-    icon: toAssetUrl(cat.icon || cat.image),
-  }));
+  // Display only first 7 categories + 'More' item to match the 4x2 grid look
+  const displayCategories = categories.slice(0, 7);
+  const moreItem = {
+    id: 'more',
+    title: 'More',
+    icon: 'more-icon-placeholder', // We'll handle this in CategoryCard or here
+    isMore: true
+  };
 
   return (
-    <div className="">
+    <div className="px-4">
       {/* Section Header */}
-      <div className="flex items-center justify-between px-4 mb-5">
-        <h2 className="text-[19px] font-bold text-gray-900 tracking-tight flex items-center gap-2">
+      <div className="flex items-center justify-between mb-5">
+        <h2 className="text-[18px] font-bold text-gray-900 tracking-tight">
           Categories
-          {/* <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[11px] font-bold uppercase tracking-wider">Explore</span> */}
         </h2>
+        <button
+          onClick={onSeeAllClick}
+          className="text-[13px] font-medium text-gray-400 hover:text-teal-600 transition-colors"
+        >
+          View all
+        </button>
       </div>
 
-      {/* Scrollable Container with better padding */}
-      <div
-        className="flex gap-1 overflow-x-auto pb-4 px-4 scrollbar-hide -mx-0"
-        style={{ scrollSnapType: 'x mandatory' }}
-      >
-        {serviceCategories.map((category, index) => {
-          const iconSrc = toAssetUrl(category.icon || category.image);
-          return (
-            <div key={category.id} className="shrink-0" style={{ scrollSnapAlign: 'start' }}>
-              <CategoryCard
-                title={category.title}
-                icon={
-                  <img
-                    src={iconSrc}
-                    alt={category.title}
-                    className="w-10 h-10 object-contain"
-                    loading="lazy"
-                    decoding="async"
-                  />
-                }
-                onClick={() => onCategoryClick?.(category)}
-                hasSaleBadge={category.hasSaleBadge}
-                index={index}
-              />
-            </div>
-          );
-        })}
+      {/* 4x2 Grid Container */}
+      <div className="grid grid-cols-4 gap-y-6 gap-x-2">
+        {displayCategories.map((category, index) => (
+          <div key={category.id} className="flex justify-center">
+            <CategoryCard
+              title={category.title}
+              icon={
+                <img
+                  src={toAssetUrl(category.icon || category.image)}
+                  alt={category.title}
+                  className="w-10 h-10 object-contain"
+                  loading="lazy"
+                />
+              }
+              onClick={() => onCategoryClick?.(category)}
+              hasSaleBadge={category.hasSaleBadge}
+              index={index}
+            />
+          </div>
+        ))}
+
+        {/* 'More' Button to complete the grid if we have many categories */}
+        <div className="flex justify-center">
+          <CategoryCard
+            title="More"
+            icon={
+              <div className="w-10 h-10 flex items-center justify-center">
+                <FiGrid className="w-6 h-6 text-blue-500" />
+              </div>
+            }
+            onClick={onSeeAllClick}
+            index={7}
+          />
+        </div>
       </div>
     </div>
   );

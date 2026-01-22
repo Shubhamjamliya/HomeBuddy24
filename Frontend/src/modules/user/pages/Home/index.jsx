@@ -323,13 +323,9 @@ const Home = () => {
 
   return (
     <div
-      className="min-h-screen pb-20"
+      className="min-h-screen pb-24"
       style={{
-        willChange: 'auto',
-        opacity: 1,
-        visibility: 'visible',
-        background: themeColors.backgroundGradient,
-        backgroundColor: '#EBF8FF', // Light blue fallback
+        background: '#F1F5F9', // Slightly darker slate to match header
         minHeight: '100vh',
         position: 'relative',
         zIndex: 1
@@ -340,10 +336,11 @@ const Home = () => {
         animate="visible"
         variants={containerVariants}
       >
-        <motion.div
-          variants={itemVariants}
-          className="backdrop-blur-md sticky top-0 z-50 border-b border-gray-200 rounded-b-[20px] shadow-sm transition-all duration-300"
-          style={{ backgroundColor: `${themeColors.headerBg}F2` }}
+        <div
+          className="sticky top-0 z-50 transition-all duration-300 backdrop-blur-xl"
+          style={{
+            background: 'radial-gradient(at 0% 0%, #BAE6FD 0%, transparent 70%), radial-gradient(at 100% 0%, #FED7AA 0%, transparent 70%), #F1F5F9',
+          }}
         >
           <Header
             location={address}
@@ -352,7 +349,7 @@ const Home = () => {
           <div className="px-4 pb-4 pt-1 max-w-lg mx-auto w-full">
             <SearchBar onInputClick={() => setIsSearchOpen(true)} />
           </div>
-        </motion.div>
+        </div>
 
         <main className="pt-6 space-y-8 pb-24 max-w-screen-xl mx-auto w-full">
           {/* Hero Section - Promo Carousel */}

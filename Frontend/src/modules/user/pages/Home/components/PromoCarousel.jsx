@@ -72,11 +72,11 @@ const PromoCarousel = memo(({ promos, onPromoClick }) => {
     >
       <div
         ref={scrollContainerRef}
-        className="flex gap-2 overflow-x-auto px-4 pb-2 scrollbar-hide snap-x snap-mandatory"
+        className="flex gap-4 overflow-x-auto px-4 pb-2 scrollbar-hide snap-x snap-mandatory"
         style={{ scrollBehavior: 'smooth' }}
       >
         {promotionalCards.map((promo) => (
-          <div key={promo.id} data-promo-card className="flex-shrink-0 snap-center">
+          <div key={promo.id} data-promo-card className="flex-shrink-0 snap-start">
             <PromoCard
               title={promo.title}
               subtitle={promo.subtitle}
@@ -93,10 +93,10 @@ const PromoCarousel = memo(({ promos, onPromoClick }) => {
         {promotionalCards.map((_, index) => (
           <div
             key={index}
-            className={`rounded-full transition-all ${index === currentIndex ? 'w-6 h-1.5' : 'w-1.5 h-1.5'}`}
+            className={`rounded-full transition-all duration-300 ${index === currentIndex ? 'w-6 h-1.5' : 'w-1.5 h-1.5'}`}
             style={{
-              backgroundColor: index === currentIndex ? themeColors.brand.yellow : `${themeColors.brand.yellow}66`,
-              boxShadow: index === currentIndex ? `0 2px 6px ${themeColors.brand.yellow}80` : '0 1px 2px rgba(0, 0, 0, 0.2)'
+              backgroundColor: index === currentIndex ? '#FACC15' : 'rgba(250, 204, 21, 0.4)',
+              boxShadow: index === currentIndex ? '0 0 10px rgba(250, 204, 21, 0.4)' : 'none'
             }}
           />
         ))}

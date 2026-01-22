@@ -51,12 +51,12 @@ const ManageAddresses = lazyLoad(() => import('../pages/ManageAddresses'));
 const Wallet = lazyLoad(() => import('../pages/Wallet'));
 const MyPlan = lazyLoad(() => import('../pages/MyPlan'));
 const MyRating = lazyLoad(() => import('../pages/MyRating'));
-const AboutHomster = lazyLoad(() => import('../pages/AboutHomster'));
+const AboutHomeBuddy = lazyLoad(() => import('../pages/AboutHomster'));
 const UpdateProfile = lazyLoad(() => import('../pages/UpdateProfile'));
 const Login = lazyLoad(() => import('../pages/login'));
 const Signup = lazyLoad(() => import('../pages/signup'));
 const ServiceDynamic = lazyLoad(() => import('../pages/ServiceDynamic'));
-const Scrap = lazyLoad(() => import('../pages/Scrap'));
+const Shop = lazyLoad(() => import('../pages/Shop'));
 const Notifications = lazyLoad(() => import('../pages/Notifications'));
 const HelpSupport = lazyLoad(() => import('../pages/HelpSupport'));
 
@@ -78,7 +78,7 @@ const UserRoutes = () => {
   // useAppNotifications('user');
 
   // Pages where BottomNav should be shown
-  const bottomNavPages = ['/user', '/user/', '/user/my-bookings', '/user/scrap', '/user/cart', '/user/account'];
+  const bottomNavPages = ['/user', '/user/', '/user/my-bookings', '/user/shop', '/user/cart', '/user/account'];
   const shouldShowBottomNav = bottomNavPages.includes(location.pathname);
 
   // Check if we hide the live booking card (e.g. if we are on the specific booking details or track page)
@@ -90,7 +90,7 @@ const UserRoutes = () => {
     '/user', '/user/', '/user/rewards', '/user/account', '/user/native', '/user/cart',
     '/user/checkout', '/user/my-bookings', '/user/settings', '/user/manage-payment-methods',
     '/user/manage-addresses', '/user/wallet', '/user/my-plan',
-    '/user/my-rating', '/user/about-homebuddy', '/user/update-profile', '/user/scrap',
+    '/user/my-rating', '/user/about-homebuddy', '/user/update-profile', '/user/shop',
     '/user/notifications', '/user/help-support'
   ];
   const isDynamicServicePage = !staticUserPaths.includes(location.pathname) &&
@@ -128,9 +128,9 @@ const UserRoutes = () => {
             <Route path="/wallet" element={<ProtectedRoute userType="user"><Wallet /></ProtectedRoute>} />
             <Route path="/my-plan" element={<ProtectedRoute userType="user"><MyPlan /></ProtectedRoute>} />
             <Route path="/my-rating" element={<ProtectedRoute userType="user"><MyRating /></ProtectedRoute>} />
-            <Route path="/about-homebuddy" element={<ProtectedRoute userType="user"><AboutHomster /></ProtectedRoute>} />
+            <Route path="/about-homebuddy" element={<ProtectedRoute userType="user"><AboutHomeBuddy /></ProtectedRoute>} />
             <Route path="/update-profile" element={<ProtectedRoute userType="user"><UpdateProfile /></ProtectedRoute>} />
-            <Route path="/scrap" element={<ProtectedRoute userType="user"><Scrap /></ProtectedRoute>} />
+            <Route path="/shop" element={<ProtectedRoute userType="user"><Shop /></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute userType="user"><Notifications /></ProtectedRoute>} />
             <Route path="/help-support" element={<ProtectedRoute userType="user"><HelpSupport /></ProtectedRoute>} />
             <Route path="/:slug" element={<ProtectedRoute userType="user"><ServiceDynamic /></ProtectedRoute>} />

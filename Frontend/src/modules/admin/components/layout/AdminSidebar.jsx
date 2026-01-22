@@ -32,7 +32,6 @@ const iconMap = {
   Payments: FiDollarSign,
   Reports: FiFileText,
   Notifications: FiBell,
-  "Scrap Items": FiTrash2,
   Reviews: FiStar,
   Settlements: FiDollarSign,
   Settings: FiSettings,

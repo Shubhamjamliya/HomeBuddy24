@@ -1,88 +1,33 @@
-import React, { useState, useRef, memo, useEffect } from 'react';
-import { gsap } from 'gsap';
-import { createRipple } from '../../../../utils/gsapAnimations';
-
+import React, { memo } from 'react';
 import { themeColors } from '../../../../theme';
 
-const CategoryCard = memo(({ icon, title, onClick, hasSaleBadge = false, index = 0 }) => {
-  const cardRef = useRef(null);
-
-  // Simple entrance animation
-  useEffect(() => {
-    if (cardRef.current) {
-      gsap.fromTo(
-        cardRef.current,
-        { y: 15, opacity: 0 },
-        {
-          y: 0,
-          opacity: 1,
-          duration: 0.4,
-          delay: index * 0.05,
-          ease: 'power2.out',
-        }
-      );
-    }
-  }, [index]);
-
+const CategoryCard = memo(({ icon, title, onClick, hasSaleBadge = false }) => {
   return (
     <div
-      ref={cardRef}
-      className="flex flex-col items-center justify-center p-1 cursor-pointer relative category-card-container group transition-transform duration-300 ease-out active:scale-95"
+      className="flex flex-col items-center cursor-pointer relative group active:scale-95 transition-all duration-200"
       onClick={onClick}
-      style={{
-        minWidth: 'fit-content',
-        width: '76px',
-        opacity: 0, // Start hidden for GSAP
-      }}
+      style={{ width: '70px' }}
     >
       <div
-        className="w-[64px] h-[64px] rounded-[20px] flex items-center justify-center mb-2 relative border border-white flex-shrink-0 transition-all duration-300 group-hover:shadow-md group-hover:scale-105"
-        style={{
-          background: `linear-gradient(135deg, #FFFFFF 0%, ${themeColors.brand.teal}10 100%)`,
-          boxShadow: themeColors.cardShadow,
-        }}
-        onMouseEnter={(e) => e.currentTarget.style.borderColor = `${themeColors.brand.teal}33`}
-        onMouseLeave={(e) => e.currentTarget.style.borderColor = 'white'}
+        className="w-[60px] h-[60px] rounded-[24px] flex items-center justify-center mb-2 relative transition-all duration-300 bg-white shadow-sm border border-gray-50 group-hover:shadow-md group-hover:-translate-y-1"
       >
-        {icon || (
-          <svg
-            className="w-7 h-7 text-gray-400 transition-colors duration-300"
-            style={{ color: 'inherit' }}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            onMouseEnter={(e) => e.currentTarget.style.color = themeColors.button}
-            onMouseLeave={(e) => e.currentTarget.style.color = 'inherit'}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-        )}
+        <div className="w-full h-full flex items-center justify-center p-3">
+          {icon}
+        </div>
+
         {hasSaleBadge && (
           <div
-            className="absolute -top-1.5 -right-1.5 text-white text-[9px] font-bold px-2 py-0.5 rounded-full shadow-lg z-10 border border-white"
+            className="absolute -top-1 -right-1 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full shadow-sm z-10"
             style={{
-              background: themeColors.gradient,
-              boxShadow: `0 4px 12px ${themeColors.brand.teal}4D`
+              background: 'linear-gradient(135deg, #FF6B6B 0%, #EE5253 100%)'
             }}
           >
-            SALE
+            -25%
           </div>
         )}
       </div>
       <span
-        className="text-[11px] text-center text-gray-700 font-medium leading-snug tracking-tight transition-colors duration-300"
-        style={{
-          wordWrap: 'break-word',
-          maxWidth: '76px',
-          color: 'inherit'
-        }}
-        onMouseEnter={(e) => e.currentTarget.style.color = themeColors.button}
-        onMouseLeave={(e) => e.currentTarget.style.color = 'inherit'}
+        className="text-[11px] text-center text-gray-500 font-medium leading-tight line-clamp-1 group-hover:text-gray-900 transition-colors"
       >
         {title}
       </span>

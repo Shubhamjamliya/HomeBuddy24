@@ -56,11 +56,10 @@ const BookingMap = lazyLoad(() => import('../pages/BookingMap'));
 const Settings = lazyLoad(() => import('../pages/Settings'));
 const AddressManagement = lazyLoad(() => import('../pages/AddressManagement'));
 const Notifications = lazyLoad(() => import('../pages/Notifications'));
-const Scrap = lazyLoad(() => import('../pages/Scrap'));
 const SettlementRequest = lazyLoad(() => import('../pages/Wallet/SettlementRequest'));
 const SettlementHistory = lazyLoad(() => import('../pages/Wallet/SettlementHistory'));
 const MyRatings = lazyLoad(() => import('../pages/MyRatings'));
-const AboutHomster = lazyLoad(() => import('../pages/AboutHomster'));
+const AboutHomeBuddy = lazyLoad(() => import('../pages/AboutHomster'));
 
 // Loading fallback component
 import LogoLoader from '../../../components/common/LogoLoader';
@@ -112,9 +111,8 @@ const VendorRoutes = () => {
             <Route path="/settings" element={<ProtectedRoute userType="vendor"><Settings /></ProtectedRoute>} />
             <Route path="/address-management" element={<ProtectedRoute userType="vendor"><AddressManagement /></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute userType="vendor"><Notifications /></ProtectedRoute>} />
-            <Route path="/scrap" element={<ProtectedRoute userType="vendor"><Scrap /></ProtectedRoute>} />
             <Route path="/my-ratings" element={<ProtectedRoute userType="vendor"><MyRatings /></ProtectedRoute>} />
-            <Route path="/about-homebuddy" element={<ProtectedRoute userType="vendor"><AboutHomster /></ProtectedRoute>} />
+            <Route path="/about-homebuddy" element={<ProtectedRoute userType="vendor"><AboutHomeBuddy /></ProtectedRoute>} />
           </Routes>
         </PageTransition>
       </Suspense>
