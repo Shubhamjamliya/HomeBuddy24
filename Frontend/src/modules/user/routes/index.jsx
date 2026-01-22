@@ -57,6 +57,9 @@ const Login = lazyLoad(() => import('../pages/login'));
 const Signup = lazyLoad(() => import('../pages/signup'));
 const ServiceDynamic = lazyLoad(() => import('../pages/ServiceDynamic'));
 const Shop = lazyLoad(() => import('../pages/Shop'));
+const ShopCart = lazyLoad(() => import('../pages/Shop/Cart'));
+const ShopCheckout = lazyLoad(() => import('../pages/Shop/Checkout'));
+const ShopConfirmation = lazyLoad(() => import('../pages/Shop/Confirmation'));
 const Notifications = lazyLoad(() => import('../pages/Notifications'));
 const HelpSupport = lazyLoad(() => import('../pages/HelpSupport'));
 
@@ -90,7 +93,7 @@ const UserRoutes = () => {
     '/user', '/user/', '/user/rewards', '/user/account', '/user/native', '/user/cart',
     '/user/checkout', '/user/my-bookings', '/user/settings', '/user/manage-payment-methods',
     '/user/manage-addresses', '/user/wallet', '/user/my-plan',
-    '/user/my-rating', '/user/about-homebuddy', '/user/update-profile', '/user/shop',
+    '/user/my-rating', '/user/about-homebuddy', '/user/update-profile', '/user/shop', '/user/shop/cart', '/user/shop/checkout', '/user/shop/confirmation',
     '/user/notifications', '/user/help-support'
   ];
   const isDynamicServicePage = !staticUserPaths.includes(location.pathname) &&
@@ -131,6 +134,9 @@ const UserRoutes = () => {
             <Route path="/about-homebuddy" element={<ProtectedRoute userType="user"><AboutHomeBuddy /></ProtectedRoute>} />
             <Route path="/update-profile" element={<ProtectedRoute userType="user"><UpdateProfile /></ProtectedRoute>} />
             <Route path="/shop" element={<ProtectedRoute userType="user"><Shop /></ProtectedRoute>} />
+            <Route path="/shop/cart" element={<ProtectedRoute userType="user"><ShopCart /></ProtectedRoute>} />
+            <Route path="/shop/checkout" element={<ProtectedRoute userType="user"><ShopCheckout /></ProtectedRoute>} />
+            <Route path="/shop/confirmation" element={<ProtectedRoute userType="user"><ShopConfirmation /></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute userType="user"><Notifications /></ProtectedRoute>} />
             <Route path="/help-support" element={<ProtectedRoute userType="user"><HelpSupport /></ProtectedRoute>} />
             <Route path="/:slug" element={<ProtectedRoute userType="user"><ServiceDynamic /></ProtectedRoute>} />
