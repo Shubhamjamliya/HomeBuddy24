@@ -33,7 +33,9 @@ const allowedOrigins = [
   'http://localhost:5174',
   'https://www.homster.in',
   'https://homster.in',
-  'https://api.homster.in'
+  'https://api.homster.in',
+  process.env.FRONTEND_URL,
+
 ];
 
 if (process.env.FRONTEND_URL) {
@@ -216,6 +218,9 @@ app.use('/api/payments', require('./routes/payment-routes/payment.routes'));
 
 // Notification routes
 app.use('/api/notifications', require('./routes/notification.routes'));
+
+// Shop routes
+app.use('/api/shop', require('./routes/shop.routes'));
 
 // Public routes (no authentication required)
 app.use('/api/public', require('./routes/public-routes/catalog.routes'));
