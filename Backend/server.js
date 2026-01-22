@@ -22,6 +22,10 @@ initRedis();
 // Initialize Express app
 const app = express();
 
+// Trust proxy - Required for express-rate-limit when behind a proxy (like Render)
+// This allows Express to trust the X-Forwarded-For header from proxies
+app.set('trust proxy', 1);
+
 // Security middleware - allow cross-origin resource loading (images) for user app
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' }
@@ -34,13 +38,12 @@ const allowedOrigins = [
   'https://www.homster.in',
   'https://homster.in',
   'https://api.homster.in',
-  process.env.FRONTEND_URL,
-
 ];
 
+// Add frontend URLs from environment variables
 if (process.env.FRONTEND_URL) {
   // Support comma-separated URLs in .env
-  const envOrigins = process.env.FRONTEND_URL.split(',').map(url => url.trim());
+  const envOrigins = process.env.FRONTEND_URL.split(',').map(url => url.trim()).filter(url => url);
   envOrigins.forEach(origin => {
     if (!allowedOrigins.includes(origin)) {
       allowedOrigins.push(origin);
@@ -54,6 +57,9 @@ app.use(cors({
     if (!origin) return callback(null, true);
 
     if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else if (origin && origin.includes('.vercel.app')) {
+      // Allow all Vercel preview deployments
       callback(null, true);
     } else {
       console.log('BLOCKED CORS ORIGIN:', origin);
@@ -220,7 +226,7 @@ app.use('/api/payments', require('./routes/payment-routes/payment.routes'));
 app.use('/api/notifications', require('./routes/notification.routes'));
 
 // Shop routes
-app.use('/api/shop', require('./routes/shop.routes'));
+app.use('/api/shop', require('./routes/shop.routes.js'));
 
 // Public routes (no authentication required)
 app.use('/api/public', require('./routes/public-routes/catalog.routes'));
