@@ -18,7 +18,8 @@ const {
   getMyOrders,
   getOrderDetails,
   getAllOrders,
-  updateOrderStatus
+  updateOrderStatus,
+  cancelOrder
 } = require('../controllers/shopOrderController');
 const { authenticate } = require('../middleware/authMiddleware');
 const { isAdmin } = require('../middleware/roleMiddleware');
@@ -32,6 +33,7 @@ router.get('/products/:id', getProduct);
 router.post('/orders', authenticate, createOrder);
 router.get('/orders/my', authenticate, getMyOrders);
 router.get('/orders/:id', authenticate, getOrderDetails);
+router.put('/orders/:id/cancel', authenticate, cancelOrder);
 
 // Admin Routes (Admin Only)
 router.post('/categories', authenticate, isAdmin, createCategory);

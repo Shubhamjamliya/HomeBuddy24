@@ -74,3 +74,32 @@ exports.updateOrderStatus = async (req, res) => {
     res.status(400).json({ success: false, message: err.message });
   }
 };
+
+exports.cancelOrder = async (req, res) => {
+  try {
+    const order = await ShopOrder.findById(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    // Ensure the user owns the order
+    if (order.user.toString() !== req.user.id) {
+      return res.status(401).json({ success: false, message: 'Not authorized to cancel this order' });
+    }
+
+    // Only allow cancellation if status is 'Pending'
+    if (order.orderStatus !== 'Pending') {
+      return res.status(400).json({ success: false, message: `Cannot cancel order with status: ${order.orderStatus}` });
+    }
+
+    order.orderStatus = 'Cancelled';
+    await order.save();
+
+    res.status(200).json({ success: true, data: order, message: 'Order cancelled successfully' });
+  } catch (err) {
+    console.error('Cancel Order Error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+

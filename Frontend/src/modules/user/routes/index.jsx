@@ -84,9 +84,14 @@ const UserRoutes = () => {
   // Global notifications are now handled by SocketProvider at App level
   // useAppNotifications('user');
 
+  // Optimize path normalization
+  const normalizedPath = location.pathname.endsWith('/') && location.pathname.length > 1
+    ? location.pathname.slice(0, -1)
+    : location.pathname;
+
   // Pages where BottomNav should be shown
-  const bottomNavPages = ['/user', '/user/', '/user/my-bookings', '/user/shop', '/user/cart', '/user/account'];
-  const shouldShowBottomNav = bottomNavPages.includes(location.pathname);
+  const bottomNavPages = ['/user', '/user/my-bookings', '/user/shop', '/user/cart', '/user/account'];
+  const shouldShowBottomNav = bottomNavPages.includes(normalizedPath);
 
   // Check if we hide the live booking card (e.g. if we are on the specific booking details or track page)
   const isBookingDetailsPage = location.pathname.match(/^\/user\/booking\/[a-zA-Z0-9]+(\/track)?$/);

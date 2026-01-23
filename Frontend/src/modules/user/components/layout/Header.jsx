@@ -53,9 +53,9 @@ const Header = ({ location, onLocationClick }) => {
     <header className="px-5 pt-8 pb-3 bg-transparent relative z-[1000] w-full max-w-lg mx-auto">
       <div className="flex items-center justify-between w-full">
         {/* Left: Profile & Greeting */}
-        <div className="flex items-center gap-3" onClick={() => navigate('/user/account')}>
+        <div className="flex items-center gap-4" onClick={() => navigate('/user/account')}>
           <div className="relative group cursor-pointer">
-            <div className="w-12 h-12 rounded-2xl overflow-hidden border-2 border-white shadow-md transition-transform group-hover:scale-105 duration-300">
+            <div className="w-16 h-16 rounded-[24px] overflow-hidden border-[3px] border-white shadow-lg transition-transform group-hover:scale-105 duration-300 active:scale-95">
               {userProfile.profilePhoto ? (
                 <img
                   src={userProfile.profilePhoto}
@@ -64,21 +64,23 @@ const Header = ({ location, onLocationClick }) => {
                 />
               ) : (
                 <div
-                  className="w-full h-full flex items-center justify-center text-white font-bold text-lg"
+                  className="w-full h-full flex items-center justify-center text-white font-bold text-2xl"
                   style={{ background: `linear-gradient(135deg, ${themeColors.brand.teal}, ${themeColors.brand.orange})` }}
                 >
                   {getInitials()}
                 </div>
               )}
             </div>
-            {/* Optional online dot or badge if needed */}
+            {/* Status Dot */}
+            <div className="absolute bottom-1 right-1 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full shadow-sm z-10"></div>
           </div>
-          <div className="flex flex-col">
-            <span className="text-gray-500 text-[13px] font-medium flex items-center gap-1.5 mb-0.5">
-              Hello 👋
+
+          <div className="flex flex-col justify-center">
+            <span className="text-gray-500 text-sm font-semibold tracking-wide flex items-center gap-2 mb-0.5" style={{ fontFamily: 'sans-serif' }}>
+              Hello, <span className="animate-wave text-xl origin-[70%_70%] inline-block">👋</span>
             </span>
-            <h2 className="text-gray-900 font-bold text-[17px] tracking-tight leading-none">
-              {userProfile.name}
+            <h2 className="text-gray-900 font-black text-xl tracking-tight leading-none bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600">
+              {userProfile.name.split(' ')[0]}
             </h2>
           </div>
         </div>

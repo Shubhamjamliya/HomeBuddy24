@@ -99,6 +99,35 @@ const ProductDetails = () => {
     }
   };
 
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: product.name,
+          text: `Check out ${product.name} on HomeBuddy!`,
+          url: window.location.href,
+        });
+      } catch (error) {
+        // User cancelled or share failed, silent catch or log
+        console.log('Share dismissed or failed', error);
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        toast.success('Link copied', {
+          icon: '🔗',
+          style: {
+            borderRadius: '10px',
+            background: '#333',
+            color: '#fff',
+          },
+        });
+      } catch (err) {
+        toast.error('Failed to copy link');
+      }
+    }
+  };
+
   if (loading) return <div className="h-screen flex items-center justify-center"><LogoLoader /></div>;
   if (!product) return null;
 
@@ -116,7 +145,10 @@ const ProductDetails = () => {
           <FiArrowLeft className="w-6 h-6" />
         </button>
         <div className="flex gap-3 pointer-events-auto">
-          <button className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white active:scale-95 transition-transform">
+          <button
+            onClick={handleShare}
+            className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white active:scale-95 transition-transform"
+          >
             <FiShare2 className="w-5 h-5" />
           </button>
           <button

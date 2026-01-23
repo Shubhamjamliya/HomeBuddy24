@@ -1,11 +1,26 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiArrowLeft, FiShoppingCart, FiTrash2, FiPlus, FiMinus, FiLoader, FiBell } from 'react-icons/fi';
+import {
+  FiArrowLeft,
+  FiShoppingCart,
+  FiTrash2,
+  FiPlus,
+  FiMinus,
+  FiLoader,
+  FiBell,
+  FiCalendar,
+  FiShield,
+  FiCheckCircle,
+  FiChevronRight
+} from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
+import { motion, AnimatePresence } from 'framer-motion';
 import { themeColors } from '../../../../theme';
-import BottomNav from '../../components/layout/BottomNav';
-import LoadingSpinner from '../../components/common/LoadingSpinner';
+import { userAuthService } from '../../../../services/authService';
 import { cartService } from '../../../../services/cartService';
+import LoadingSpinner from '../../components/common/LoadingSpinner';
+
+// Import Service Icons
 import electricianIcon from '../../../../assets/images/icons/services/electrician.png';
 import womensSalonIcon from '../../../../assets/images/icons/services/womens-salon-spa-icon.png';
 import massageMenIcon from '../../../../assets/images/icons/services/massage-men-icon.png';
@@ -78,16 +93,17 @@ const Cart = () => {
   };
 
   const handleDeleteCategory = async (category) => {
+    if (!window.confirm(`Remove all items from ${category}?`)) return;
     try {
       const response = await cartService.removeCategoryItems(category);
       if (response.success) {
         setCartItems(response.data || []);
-        toast.success('Category items removed');
+        toast.success('Category removed');
       } else {
-        toast.error(response.message || 'Failed to remove category items');
+        toast.error(response.message || 'Failed to remove');
       }
     } catch (error) {
-      toast.error('Failed to remove category items');
+      toast.error('Failed to remove category');
     }
   };
 
@@ -96,30 +112,12 @@ const Cart = () => {
       const response = await cartService.removeItem(itemId);
       if (response.success) {
         setCartItems(response.data || []);
-        toast.success('Item removed from cart');
+        toast.success('Item removed');
       } else {
         toast.error(response.message || 'Failed to remove item');
       }
     } catch (error) {
       toast.error('Failed to remove item');
-    }
-  };
-
-  const handleQuantityChange = async (itemId, change) => {
-    try {
-      const item = cartItems.find(i => (i._id || i.id) === itemId);
-      if (!item) return;
-
-      const newCount = Math.max(1, (item.serviceCount || 1) + change);
-      const response = await cartService.updateItem(itemId, newCount);
-
-      if (response.success) {
-        setCartItems(response.data || []);
-      } else {
-        toast.error(response.message || 'Failed to update quantity');
-      }
-    } catch (error) {
-      toast.error('Failed to update quantity');
     }
   };
 
@@ -145,210 +143,189 @@ const Cart = () => {
     navigate('/user/checkout', { state: { category: category } });
   };
 
-  const handleCartClick = () => {
-    // Already on cart page
+  // Animation variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1 }
+    }
   };
 
-  // Calculate totals for all items
-  const totalPrice = cartItems.reduce((sum, item) => sum + (item.price || 0), 0);
-  const totalOriginalPrice = cartItems.reduce((sum, item) => {
-    const unitOriginalPrice = item.originalPrice || (item.unitPrice || (item.price / (item.serviceCount || 1)));
-    return sum + (unitOriginalPrice * (item.serviceCount || 1));
-  }, 0);
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0 }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <LoadingSpinner />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm sticky top-0 z-30">
-        <div className="px-4 pt-4 pb-3 flex items-center justify-between">
+    <div className="min-h-screen bg-[#F8FAFC] relative pb-24 font-sans text-gray-900">
+      {/* Dynamic Background - compacted height */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <div className="absolute top-0 left-0 w-full h-[40vh] bg-[#F1F5F9]"
+          style={{
+            background: 'radial-gradient(at 0% 0%, #E0F2FE 0%, transparent 70%), radial-gradient(at 100% 0%, #FAE8FF 0%, transparent 70%), #F8FAFC'
+          }}
+        />
+      </div>
+
+      <div className="relative z-10">
+        {/* Header - slightly more compact */}
+        <header className="sticky top-0 z-40 backdrop-blur-xl bg-white/80 border-b border-white/20 px-4 py-3 flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-3">
-            <button
+            <motion.button
+              whileTap={{ scale: 0.9 }}
               onClick={handleBack}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              className="p-2 bg-white rounded-full hover:bg-gray-50 transition-all shadow-sm border border-gray-100"
             >
-              <FiArrowLeft className="w-5 h-5 text-black" />
-            </button>
-            <div className="flex items-center gap-2">
-              <FiShoppingCart className="w-5 h-5" style={{ color: themeColors.button }} />
-              <h1 className="text-xl font-bold text-black">Your cart</h1>
-              {cartCount > 0 && (
-                <span className="bg-gray-200 text-gray-700 text-xs font-semibold px-2 py-0.5 rounded-full">
-                  {cartCount}
-                </span>
-              )}
+              <FiArrowLeft className="w-4 h-4 text-gray-700" />
+            </motion.button>
+            <div>
+              <h1 className="text-lg font-bold text-gray-900 leading-none">My Cart</h1>
+              <p className="text-[10px] text-gray-500 font-medium">Review your services</p>
             </div>
           </div>
-          <button
-            onClick={() => navigate('/user/notifications')}
-            className="p-2 hover:bg-gray-50 rounded-full transition-colors"
-          >
-            <FiBell className="w-6 h-6 text-gray-700" />
-          </button>
-        </div>
-      </header>
+          <div className="flex items-center gap-2">
+            <div className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded-md text-[10px] font-bold border border-blue-100 flex items-center gap-1">
+              <FiShield className="w-3 h-3" /> Secure
+            </div>
+          </div>
+        </header>
 
-      {/* Cart Items - Grouped by Category */}
-      <main className="px-4 py-4" style={{ paddingBottom: cartItems.length > 0 ? '70px' : '100px' }}>
-        {loading ? (
-          <div className="space-y-6">
-            {[1, 2].map(i => (
-              <div key={i} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 animate-pulse">
-                {/* Category Header Skeleton */}
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-gray-200 rounded-xl"></div>
-                  <div className="space-y-2">
-                    <div className="h-4 w-32 bg-gray-200 rounded"></div>
-                    <div className="h-3 w-24 bg-gray-200 rounded"></div>
-                  </div>
-                </div>
-                {/* Items Skeleton */}
-                <div className="space-y-3">
-                  <div className="h-10 w-full bg-gray-100 rounded"></div>
-                  <div className="h-10 w-full bg-gray-100 rounded"></div>
-                </div>
-                {/* Buttons Skeleton */}
-                <div className="flex gap-2 mt-4">
-                  <div className="flex-1 h-10 bg-gray-200 rounded-xl"></div>
-                  <div className="flex-1 h-10 bg-gray-300 rounded-xl"></div>
-                </div>
+        <motion.main
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="px-3 pt-4 max-w-xl mx-auto space-y-3"
+        >
+          {cartItems.length === 0 ? (
+            <motion.div variants={itemVariants} className="flex flex-col items-center justify-center py-20 text-center">
+              <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-xl shadow-blue-500/10 mb-5 border-4 border-blue-50">
+                <FiShoppingCart className="w-8 h-8 text-blue-500" />
               </div>
-            ))}
-          </div>
-        ) : cartItems.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20">
-            <FiShoppingCart className="w-16 h-16 text-gray-300 mb-4" />
-            <p className="text-gray-500 text-lg font-medium">Your cart is empty</p>
-            <p className="text-gray-400 text-sm mt-2">Add services to get started</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {Object.entries(groupedItems).map(([category, items]) => {
-              const categoryTotal = items.reduce((sum, item) => sum + (item.price || 0), 0);
-              const categoryIcon = getCategoryIcon(category);
-              const serviceCount = items.reduce((sum, item) => sum + (item.serviceCount || 1), 0);
+              <h3 className="text-xl font-bold text-gray-900 mb-1">Your cart is empty</h3>
+              <p className="text-sm text-gray-500 mb-6 max-w-xs mx-auto">Looks like you haven't added any services yet.</p>
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={() => navigate('/user')}
+                className="px-6 py-2.5 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-600/30 hover:bg-blue-700 transition-all flex items-center gap-2 text-sm"
+              >
+                Explore Services <FiChevronRight />
+              </motion.button>
+            </motion.div>
+          ) : (
+            <AnimatePresence>
+              {Object.entries(groupedItems).map(([category, items]) => {
+                const categoryTotal = items.reduce((sum, item) => sum + (item.price || 0), 0);
+                const categoryIcon = getCategoryIcon(category);
+                const serviceCount = items.reduce((sum, item) => sum + (item.serviceCount || 1), 0);
 
-              return (
-                <div
-                  key={category}
-                  className="bg-white rounded-2xl shadow-md border border-gray-100"
-                  style={{
-                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05)',
-                    padding: '16px'
-                  }}
-                >
-                  {/* Category Header */}
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3 flex-1">
-                      {/* Category Icon */}
-                      <div
-                        className="w-16 h-16 rounded-xl flex items-center justify-center shrink-0 overflow-hidden"
-                        style={{
-                          backgroundColor: `${themeColors.brand.teal}15`,
-                          border: `2px solid ${themeColors.brand.teal}20`
-                        }}
-                      >
-                        <img
-                          src={categoryIcon}
-                          alt={category}
-                          className="w-12 h-12 object-contain"
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                            if (e.target.nextSibling) {
-                              e.target.nextSibling.style.display = 'flex';
-                            }
-                          }}
-                        />
-                        <div
-                          className="hidden items-center justify-center"
-                          style={{
-                            width: '48px',
-                            height: '48px',
-                            display: 'none'
-                          }}
-                        >
-                          <FiShoppingCart className="w-8 h-8" style={{ color: themeColors.button }} />
+                return (
+                  <motion.div
+                    key={category}
+                    variants={itemVariants}
+                    layout
+                    className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 group hover:border-blue-200 transition-all"
+                  >
+                    {/* Compact Category Header */}
+                    <div className="p-4 pb-2">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0 border border-blue-100 p-1.5">
+                            <img src={categoryIcon} alt={category} className="w-full h-full object-contain" />
+                          </div>
+                          <div>
+                            <h2 className="text-sm font-bold text-gray-900 leading-tight">{category}</h2>
+                            <p className="text-[11px] text-gray-500 font-medium mt-0.5">
+                              {serviceCount} Items • <span className="text-blue-600 font-bold">₹{categoryTotal}</span>
+                            </p>
+                          </div>
                         </div>
-                      </div>
-
-                      {/* Category Info */}
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-base font-bold text-black mb-1">{category}</h3>
-                        <p className="text-sm text-gray-600">
-                          {serviceCount} {serviceCount === 1 ? 'service' : 'services'} • ₹{categoryTotal.toLocaleString('en-IN')}
-                        </p>
+                        <button
+                          onClick={() => handleDeleteCategory(category)}
+                          className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                        >
+                          <FiTrash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
 
-                    {/* Delete Category Button */}
-                    <button
-                      onClick={() => handleDeleteCategory(category)}
-                      className="p-2 hover:bg-red-50 rounded-full transition-colors shrink-0"
-                    >
-                      <FiTrash2 className="w-5 h-5 text-red-500" />
-                    </button>
-                  </div>
+                    {/* Compact Services List */}
+                    <div className="px-4 space-y-2 mb-3">
+                      {items.map((item) => (
+                        <motion.div
+                          key={item._id || item.id}
+                          layout
+                          className="flex items-center gap-3 p-2.5 bg-gray-50/50 rounded-xl border border-gray-100/80 hover:bg-blue-50/30 transition-colors"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex justify-between items-center mb-0.5">
+                              <h3 className="font-semibold text-gray-900 text-[13px] leading-snug truncate pr-2">
+                                {item.title}
+                              </h3>
+                              <span className="font-bold text-gray-900 text-xs shrink-0">₹{item.price}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-[10px] text-gray-500 font-medium bg-white px-1.5 py-0.5 rounded border border-gray-100">x{item.serviceCount || 1}</span>
+                              <button
+                                onClick={() => handleDelete(item._id || item.id)}
+                                className="text-[10px] text-red-400 hover:text-red-600 font-medium transition-colors"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
 
-                  {/* Services List */}
-                  <div className="mb-4 space-y-2">
-                    {items.map((item) => (
-                      <div key={item._id || item.id} className="flex items-start justify-between py-2 border-b border-gray-100 last:border-0">
-                        <div className="flex-1">
-                          <p className="text-sm text-gray-800 font-medium">
-                            {item.title} X {item.serviceCount || 1}
-                          </p>
-                          {item.description && (
-                            <p className="text-xs text-gray-500 mt-0.5">{item.description}</p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-sm font-semibold text-black">
-                            ₹{(item.price || 0).toLocaleString('en-IN')}
-                          </span>
-                          <button
-                            onClick={() => handleDelete(item._id || item.id)}
-                            className="p-1 hover:bg-red-50 rounded transition-colors"
-                          >
-                            <FiTrash2 className="w-4 h-4 text-red-500" />
-                          </button>
-                        </div>
+                    {/* Compact Footer Actions */}
+                    <div className="px-4 pb-4 pt-2 bg-gradient-to-b from-white to-gray-50/30">
+                      <div className="flex justify-between items-center mb-3 px-1 border-t border-dashed border-gray-100 pt-2">
+                        <span className="text-xs text-gray-500 font-medium">Subtotal</span>
+                        <span className="text-sm font-black text-gray-900">₹{categoryTotal.toLocaleString('en-IN')}</span>
                       </div>
-                    ))}
-                  </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleAddServices(category)}
-                      className="flex-1 px-4 py-2.5 bg-white border-2 border-gray-300 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all active:scale-95"
-                    >
-                      Add Services
-                    </button>
-                    <button
-                      onClick={() => handleCategoryCheckout(category)}
-                      className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all active:scale-95 shadow-md"
-                      style={{
-                        backgroundColor: themeColors.button,
-                        boxShadow: `0 2px 6px ${themeColors.brand.teal}4D`
-                      }}
-                      onMouseEnter={(e) => {
-                        e.target.style.backgroundColor = themeColors.brand.teal;
-                        e.target.style.boxShadow = `0 4px 12px ${themeColors.brand.teal}66`;
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.backgroundColor = themeColors.button;
-                        e.target.style.boxShadow = `0 2px 6px ${themeColors.brand.teal}4D`;
-                      }}
-                    >
-                      Checkout
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </main>
+                      <div className="flex gap-2">
+                        <motion.button
+                          whileTap={{ scale: 0.97 }}
+                          onClick={() => handleAddServices(category)}
+                          className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-bold text-xs hover:bg-gray-50 transition-all"
+                        >
+                          + Add
+                        </motion.button>
+                        <motion.button
+                          whileTap={{ scale: 0.97 }}
+                          onClick={() => handleCategoryCheckout(category)}
+                          className="flex-[1.5] bg-blue-600 text-white py-2.5 rounded-xl font-bold text-xs shadow-md shadow-blue-600/20 flex items-center justify-center gap-1.5 hover:bg-blue-700 transition-all"
+                        >
+                          Checkout <FiChevronRight className="w-3 h-3" />
+                        </motion.button>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+          )}
 
-      <BottomNav />
+          {/* Compact Safety Badge */}
+          {cartItems.length > 0 && (
+            <motion.div variants={itemVariants} className="bg-white/50 backdrop-blur rounded-xl p-3 flex items-center justify-center gap-2 border border-blue-50">
+              <FiCheckCircle className="w-4 h-4 text-green-500" />
+              <p className="text-[10px] text-gray-500 font-medium">100% Secure Checkout & Verified Professionals</p>
+            </motion.div>
+          )}
+
+        </motion.main>
+      </div>
     </div>
   );
 };

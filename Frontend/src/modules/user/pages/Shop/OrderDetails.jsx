@@ -12,6 +12,7 @@ import {
 } from 'react-icons/fi';
 import shopService from '../../services/shopService';
 import LogoLoader from '../../../../components/common/LogoLoader';
+import ConfirmDialog from '../../../../components/common/ConfirmDialog';
 import { toast } from 'react-hot-toast';
 
 const OrderDetails = () => {
@@ -19,6 +20,7 @@ const OrderDetails = () => {
   const navigate = useNavigate();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
 
   useEffect(() => {
     fetchOrderDetails();
@@ -38,6 +40,28 @@ const OrderDetails = () => {
       console.error(error);
       toast.error('Failed to load order details');
     } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelClick = () => {
+    setIsCancelModalOpen(true);
+  };
+
+  const handleConfirmCancel = async () => {
+    try {
+      setLoading(true);
+      const response = await shopService.cancelOrder(id);
+      if (response.success) {
+        toast.success('Order cancelled successfully');
+        fetchOrderDetails(); // Refresh details to show new status
+      } else {
+        toast.error(response.message || 'Failed to cancel order');
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error('Error cancelling order');
       setLoading(false);
     }
   };
@@ -174,7 +198,7 @@ const OrderDetails = () => {
         <div className="space-y-3 pt-4">
           {order.orderStatus === 'Pending' && (
             <button
-              onClick={() => toast.error('Cancellation not implemented yet')}
+              onClick={handleCancelClick}
               className="w-full bg-red-50 text-red-600 font-bold py-3.5 rounded-xl transition-colors hover:bg-red-100 flex items-center justify-center gap-2"
             >
               <FiXCircle /> Cancel Order
@@ -196,7 +220,19 @@ const OrderDetails = () => {
           </button>
         </div>
       </div>
-    </div>
+
+
+      <ConfirmDialog
+        isOpen={isCancelModalOpen}
+        onClose={() => setIsCancelModalOpen(false)}
+        onConfirm={handleConfirmCancel}
+        title="Cancel Order"
+        message="Are you sure you want to cancel this order? This action cannot be undone."
+        confirmLabel="Yes, Cancel Order"
+        cancelLabel="No, Keep Order"
+        type="danger"
+      />
+    </div >
   );
 };
 

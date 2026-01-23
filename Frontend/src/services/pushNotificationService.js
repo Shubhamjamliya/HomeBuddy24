@@ -191,7 +191,7 @@ async function registerFCMToken(userType = 'user', forceUpdate = false) {
 }
 
 /**
- * Remove FCM token from backend (removes tokens for current platform)
+ * Remove FCM token from backend (removes specific token for current device)
  * @param {string} userType - 'user', 'vendor', or 'worker'
  */
 async function removeFCMToken(userType = 'user') {
@@ -199,50 +199,61 @@ async function removeFCMToken(userType = 'user') {
     // Detect platform automatically
     const platform = getPlatformType();
     const storageKey = `fcm_token_${userType}_${platform}`;
+    const tokenToRemove = localStorage.getItem(storageKey);
 
-    console.log(`[FCM] Removing ${platform} tokens for ${userType}...`);
+    if (!tokenToRemove) {
+      // console.log('[FCM] No token found in localStorage to remove');
+      return;
+    }
+
+    // console.log(`[FCM] Removing ${platform} token for ${userType}...`);
 
     // Determine API endpoint based on user type
     let endpoint;
     let authTokenKey;
     switch (userType) {
       case 'vendor':
-        endpoint = '/vendors/fcm-tokens/remove-all';
+        endpoint = '/vendors/fcm-tokens/remove';
         authTokenKey = 'vendorAccessToken';
         break;
       case 'worker':
-        endpoint = '/workers/fcm-tokens/remove-all';
+        endpoint = '/workers/fcm-tokens/remove';
         authTokenKey = 'workerAccessToken';
         break;
       default:
-        endpoint = '/users/fcm-tokens/remove-all';
+        endpoint = '/users/fcm-tokens/remove';
         authTokenKey = 'accessToken';
     }
 
     const authToken = localStorage.getItem(authTokenKey);
-    if (!authToken) {
-      localStorage.removeItem(storageKey);
-      return;
+    // If we have an auth token, try to remove from backend
+    if (authToken) {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+
+      // Call remove endpoint with specific token
+      await fetch(`${baseUrl}${endpoint}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          token: tokenToRemove,
+          platform: platform
+        })
+      });
+      console.log(`[FCM] ✅ Token removed from backend`);
     }
 
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
-
-    // Call remove-all with detected platform
-    await fetch(`${baseUrl}${endpoint}`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken}`
-      },
-      body: JSON.stringify({
-        platform: platform
-      })
-    });
-
+    // Always remove from local storage
     localStorage.removeItem(storageKey);
-    console.log(`[FCM] ✅ All ${platform} FCM tokens removed on logout`);
+    console.log(`[FCM] Token cleared from localStorage`);
   } catch (error) {
-    console.error('[FCM] Error removing FCM tokens:', error);
+    console.error('[FCM] Error removing FCM token:', error);
+    // Ensure local cleanup happens even on error
+    const platform = getPlatformType();
+    const storageKey = `fcm_token_${userType}_${platform}`;
+    localStorage.removeItem(storageKey);
   }
 }
 

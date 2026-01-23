@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   FiArrowLeft,
   FiSearch,
@@ -17,7 +17,8 @@ import shopService from '../../services/shopService';
 
 const ShopPage = () => {
   const navigate = useNavigate();
-  const [activeCategory, setActiveCategory] = useState('All');
+  const location = useLocation(); // Imported
+  const [activeCategory, setActiveCategory] = useState(location.state?.initialCategory || 'All');
   const [searchQuery, setSearchQuery] = useState('');
   const [cartCount, setCartCount] = useState(0);
   const [flyingItems, setFlyingItems] = useState([]);

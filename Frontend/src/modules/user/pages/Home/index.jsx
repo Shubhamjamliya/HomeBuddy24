@@ -2,10 +2,10 @@ import React, { useState, useEffect, useLayoutEffect, lazy, Suspense } from 'rea
 import { useNavigate, useLocation } from 'react-router-dom';
 import { themeColors } from '../../../../theme';
 import Header from '../../components/layout/Header';
-import BottomNav from '../../components/layout/BottomNav';
 import SearchBar from './components/SearchBar';
 import ServiceCategories from './components/ServiceCategories';
 import { publicCatalogService } from '../../../../services/catalogService';
+import shopService from '../../services/shopService'; // Import Shop Service
 import { useCart } from '../../../../context/CartContext';
 import { toast } from 'react-hot-toast';
 import { registerFCMToken } from '../../../../services/pushNotificationService';
@@ -13,6 +13,7 @@ import { motion } from 'framer-motion';
 
 // Lazy load heavy components for better initial load performance
 import PromoCarousel from './components/PromoCarousel';
+import ShopCategories from './components/ShopCategories'; // Import Shop Categories
 // Lazy load OTHER heavy components
 const NewAndNoteworthy = lazy(() => import('./components/NewAndNoteworthy'));
 const MostBookedServices = lazy(() => import('./components/MostBookedServices'));
@@ -21,6 +22,7 @@ const ServiceSectionWithRating = lazy(() => import('./components/ServiceSectionW
 const Banner = lazy(() => import('./components/Banner'));
 const ReferEarnSection = lazy(() => import('./components/ReferEarnSection'));
 import CategoryModal from './components/CategoryModal';
+const AllCategoriesModal = lazy(() => import('./components/AllCategoriesModal'));
 import SearchOverlay from './components/SearchOverlay';
 import LogoLoader from '../../../../components/common/LogoLoader';
 import AddressSelectionModal from '../Checkout/components/AddressSelectionModal';
@@ -96,6 +98,7 @@ const Home = () => {
   const { cartCount, addToCart } = useCart();
 
   const [categories, setCategories] = useState([]);
+  const [shopCategories, setShopCategories] = useState([]); // Shop Categories State
   const [homeContent, setHomeContent] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -133,15 +136,17 @@ const Home = () => {
 
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [isAllCategoriesModalOpen, setIsAllCategoriesModalOpen] = useState(false);
 
   // Fetch categories and home content on mount
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [categoriesRes, homeContentRes] = await Promise.all([
+        const [categoriesRes, homeContentRes, shopCatRes] = await Promise.all([
           publicCatalogService.getCategories(),
-          publicCatalogService.getHomeContent()
+          publicCatalogService.getHomeContent(),
+          shopService.getCategories() // Fetch Shop Categories
         ]);
 
         let hasData = false;
@@ -157,6 +162,15 @@ const Home = () => {
           }));
           setCategories(mappedCategories);
           if (mappedCategories.length > 0) hasData = true;
+        }
+
+        if (shopCatRes.success) {
+          const mappedShopCats = (shopCatRes.data || []).map(cat => ({
+            id: cat._id,
+            name: cat.name,
+            image: cat.icon || cat.image
+          }));
+          setShopCategories(mappedShopCats);
         }
 
         if (homeContentRes.success) {
@@ -189,6 +203,10 @@ const Home = () => {
   const handleCategoryClick = (category) => {
     setSelectedCategory(category);
     setIsCategoryModalOpen(true);
+  };
+
+  const handleShopCategoryClick = (category) => {
+    navigate('/user/shop', { state: { initialCategory: category.name } });
   };
 
   const handlePromoClick = (promo) => {
@@ -373,6 +391,18 @@ const Home = () => {
             </motion.section>
           )}
 
+          {/* Shop Categories Section (One Line Horizontal) */}
+          {shopCategories.length > 0 && (
+            <motion.section variants={itemVariants} className="relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-b from-purple-50/20 to-transparent pointer-events-none -z-10" />
+              <ShopCategories
+                categories={shopCategories}
+                onCategoryClick={handleShopCategoryClick}
+              />
+            </motion.section>
+          )}
+
+
           {/* Categories Section */}
           {homeContent?.isCategoriesVisible !== false && (
             <motion.section variants={itemVariants} className="relative overflow-hidden">
@@ -380,10 +410,22 @@ const Home = () => {
               <ServiceCategories
                 categories={categories}
                 onCategoryClick={handleCategoryClick}
-                onSeeAllClick={() => { }}
+                onSeeAllClick={() => setIsAllCategoriesModalOpen(true)}
               />
             </motion.section>
           )}
+
+
+          {/* All Categories Modal */}
+          <Suspense fallback={null}>
+            <AllCategoriesModal
+              isOpen={isAllCategoriesModalOpen}
+              onClose={() => setIsAllCategoriesModalOpen(false)}
+              categories={categories}
+              onCategoryClick={handleCategoryClick}
+            />
+          </Suspense>
+
 
           {/* Curated Services */}
           {homeContent?.isCuratedVisible !== false && (
@@ -536,8 +578,6 @@ const Home = () => {
           </motion.div>
         </main>
       </motion.div>
-
-      <BottomNav />
 
       {/* Category Modal */}
       <CategoryModal

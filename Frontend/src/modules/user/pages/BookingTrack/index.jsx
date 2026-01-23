@@ -441,15 +441,14 @@ const BookingTrack = () => {
     }
   }, [isLoaded, coords, map, currentLocation]);
 
-  // Update distance, ETA, and Clear Traveled Path as rider moves
+  // Update distance, ETA, and Check for Route Deviation
   useEffect(() => {
     if (isLoaded && currentLocation && coords && window.google && directionsCalculatedRef.current) {
-      // 1. Calculate straight-line distance & ETA
       const riderPoint = new window.google.maps.LatLng(currentLocation);
       const destPoint = new window.google.maps.LatLng(coords);
-      const distanceMeters = window.google.maps.geometry.spherical.computeDistanceBetween(riderPoint, destPoint);
 
-      // Convert to km
+      // 1. Calculate straight-line distance & ETA updates (Always do this)
+      const distanceMeters = window.google.maps.geometry.spherical.computeDistanceBetween(riderPoint, destPoint);
       const distanceKm = distanceMeters / 1000;
 
       // Format distance
@@ -474,13 +473,12 @@ const BookingTrack = () => {
         setDuration(`${hours} hr ${mins} min`);
       }
 
-      // 2. Clear Traveled Path Visualization
+      // 2. Route Deviation & Path Updates
       if (fullRoutePathRef.current && fullRoutePathRef.current.length > 0) {
-        // Find the closest point on the original path to the current rider location
+        // Find the closest point and the distance to it
         let closestIndex = -1;
         let minDist = Infinity;
 
-        // Optimization: Only check a reasonable window if path is huge, but full check is safer for loops
         fullRoutePathRef.current.forEach((p, idx) => {
           const d = window.google.maps.geometry.spherical.computeDistanceBetween(riderPoint, p);
           if (d < minDist) {
@@ -489,13 +487,45 @@ const BookingTrack = () => {
           }
         });
 
-        // If we found a close point, update the path to start from CURRENT location, 
-        // then continue from the NEXT point in the original path.
-        if (closestIndex !== -1) {
-          // We splice the array to remove points "behind"
-          // We start drawing from the current rider position explicitly to avoid a gap
-          const remaining = fullRoutePathRef.current.slice(closestIndex + 1);
-          setRoutePath([currentLocation, ...remaining]);
+        // Threshold for recalculation (e.g., 50 meters)
+        const DEVIATION_THRESHOLD = 50;
+
+        if (minDist > DEVIATION_THRESHOLD) {
+          // Rider has deviated significantly - Recalculate Route
+          // console.log("Rider devaiated. Recalculating route...");
+          const directionsService = new window.google.maps.DirectionsService();
+          directionsService.route(
+            {
+              origin: currentLocation,
+              destination: coords,
+              travelMode: window.google.maps.TravelMode.DRIVING,
+            },
+            (result, status) => {
+              if (status === window.google.maps.DirectionsStatus.OK) {
+                // Update Route Data
+                setDirections(result);
+                const leg = result.routes[0].legs[0];
+                setDistance(leg.distance.text);
+                setDuration(leg.duration.text);
+
+                // Update Path with NEW Route
+                fullRoutePathRef.current = result.routes[0].overview_path;
+                setRoutePath(result.routes[0].overview_path);
+              }
+            }
+          );
+        } else {
+          // Rider is close to the path - Just trim the traveled part
+          // Logic: Connect Current Location -> Next Point on Path
+          if (closestIndex !== -1) {
+            const remaining = fullRoutePathRef.current.slice(closestIndex + 1);
+            // Ensure we have at least one point to connect to, otherwise we are at destination
+            if (remaining.length > 0) {
+              setRoutePath([currentLocation, ...remaining]);
+            } else {
+              setRoutePath([currentLocation, coords]);
+            }
+          }
         }
       }
     }

@@ -35,6 +35,12 @@ const shopService = {
   getProduct: async (id) => {
     const response = await api.get(`/shop/products/${id}`);
     return response.data;
+  },
+
+  // Cancel order
+  cancelOrder: async (id) => {
+    const response = await api.put(`/shop/orders/${id}/cancel`);
+    return response.data;
   }
 };
 

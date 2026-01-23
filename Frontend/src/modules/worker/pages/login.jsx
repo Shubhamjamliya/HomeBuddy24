@@ -205,7 +205,12 @@ const WorkerLogin = () => {
             <div className="space-y-6">
               <button
                 type="button"
-                onClick={() => setStep('phone')}
+                onClick={(e) => {
+                  e.preventDefault();
+                  setOtp(['', '', '', '', '', '']);
+                  setOtpToken('');
+                  setStep('phone');
+                }}
                 className="flex items-center text-sm text-gray-500 hover:text-[#347989] transition-colors mb-4 animate-stagger-1 animate-fade-in"
               >
                 <FiChevronLeft className="mr-1" /> Edit number

@@ -31,6 +31,7 @@ const getProfile = async (req, res) => {
         addresses: user.addresses || [],
         plans: user.plans || {},
         settings: user.settings || {},
+        wallet: user.wallet || { balance: 0 },
         createdAt: user.createdAt,
         updatedAt: user.updatedAt
       }

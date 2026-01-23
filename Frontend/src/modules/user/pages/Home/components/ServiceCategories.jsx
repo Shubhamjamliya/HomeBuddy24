@@ -29,7 +29,7 @@ const ServiceCategories = React.memo(({ categories, onCategoryClick, onSeeAllCli
       {/* Section Header */}
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-[18px] font-bold text-gray-900 tracking-tight">
-          Categories
+          Service Categories
         </h2>
         <button
           onClick={onSeeAllClick}

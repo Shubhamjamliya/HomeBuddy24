@@ -532,7 +532,7 @@ const getUserBookings = async (req, res) => {
         query.status = status;
       }
     } else {
-      // Default: Fetch all, including SEARCHING. Frontend will filter for active.
+      // Default: Fetch all
     }
     if (startDate || endDate) {
       query.scheduledDate = {};
@@ -543,22 +543,45 @@ const getUserBookings = async (req, res) => {
     // Pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    // Get bookings
+    // Get bookings - Optimized with .lean() and limited population
+    // We rely on denormalized data (serviceName, etc.)
     const bookings = await Booking.find(query)
-      .populate('vendorId', 'name businessName phone profilePhoto')
-      .populate('serviceId', 'title iconUrl')
-      .populate('categoryId', 'title slug')
-      .populate('workerId', 'name phone profilePhoto')
+      .select('bookingNumber status scheduledDate scheduledTime timeSlot serviceName serviceCategory serviceImages finalAmount address createdAt serviceId')
+      .populate('serviceId', 'iconUrl images') // Only populate minimal service info for image fallback
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(parseInt(limit));
+      .limit(parseInt(limit))
+      .lean(); // Use lean for performance
 
-    // Get total count
+    // Transform to match frontend expectations
+    const transformedBookings = bookings.map(booking => {
+      // Resolve image: Booking.serviceImages[0] -> Service.images[0] -> Service.iconUrl
+      let image = null;
+      if (booking.serviceImages && booking.serviceImages.length > 0) {
+        image = booking.serviceImages[0];
+      } else if (booking.serviceId) {
+        if (booking.serviceId.images && booking.serviceId.images.length > 0) {
+          image = booking.serviceId.images[0];
+        } else {
+          image = booking.serviceId.iconUrl;
+        }
+      }
+
+      return {
+        ...booking,
+        serviceImage: image,
+        // Ensure id exists (lean returns _id)
+        id: booking._id
+      };
+    });
+
+    // Get total count (Optimized: use estimatedDocumentCount if no filters, otherwise countDocuments)
+    // For specific user queries, we must use countDocuments, but rely on index { userId: 1 }
     const total = await Booking.countDocuments(query);
 
     res.status(200).json({
       success: true,
-      data: bookings,
+      data: transformedBookings,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),

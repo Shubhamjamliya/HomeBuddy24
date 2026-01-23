@@ -47,8 +47,11 @@ const BottomNav = React.memo(() => {
   ];
 
   const getActiveTab = () => {
-    const path = location.pathname;
-    if (path === '/user' || path === '/user/') return 'home';
+    const path = location.pathname.endsWith('/') && location.pathname.length > 1
+      ? location.pathname.slice(0, -1)
+      : location.pathname;
+
+    if (path === '/user') return 'home';
     if (path.startsWith('/user/my-bookings')) return 'bookings';
     if (path.startsWith('/user/shop')) return 'shop';
     if (path.startsWith('/user/cart')) return 'cart';
@@ -59,27 +62,47 @@ const BottomNav = React.memo(() => {
   const activeTab = getActiveTab();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-t border-gray-100 pb-safe">
+    <nav className="fixed bottom-0 left-0 right-0 z-[9999] bg-white/95 backdrop-blur-xl border-t border-gray-100 pb-safe">
       <div className="max-w-md mx-auto px-6 h-[68px] flex items-center justify-between">
         {navItems.map((item) => {
           const isActive = activeTab === item.id;
           const Icon = item.icon;
 
+
+          // Use centralized theme colors
+          const themeNav = themeColors.bottomNav || {};
+
+          // Fallback if theme not loaded correctly (though it should be)
+          const colorConfig = themeNav[item.id] || { color: '#3B82F6', bg: '#3B82F6' };
+
+          // Construct inline styles or dynamic classes if using arbitrary values from theme
+          // For tailwind classes, we can't easily interpolate from hex unless we use style prop or safety list.
+          // Let's use inline styles for accurate theme color usage.
+
+          const iconStyle = isActive ? { color: colorConfig.color } : {};
+          const textStyle = isActive ? { color: colorConfig.color } : {};
+          const indicatorStyle = { backgroundColor: colorConfig.bg };
+
           return (
             <button
               key={item.id}
-              onClick={() => navigate(item.path)}
+              onClick={() => {
+                if (location.pathname !== item.path) {
+                  navigate(item.path);
+                }
+              }}
               className="relative flex flex-col items-center justify-center flex-1 transition-all duration-300 group outline-none"
             >
               <div className="relative flex flex-col items-center gap-1">
-                <div className="relative">
+                <div className={`relative p-1 rounded-xl transition-all duration-300 ${isActive ? 'bg-gray-50' : 'bg-transparent'}`}>
                   <Icon
-                    className={`w-6 h-6 transition-all duration-300 ${isActive ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-500'}`}
+                    className={`w-6 h-6 transition-all duration-300 ${!isActive ? 'text-gray-400 group-hover:text-gray-500' : ''}`}
+                    style={iconStyle}
                   />
 
                   {item.isCart && cartCount > 0 && (
                     <span
-                      className="absolute -top-1.5 -right-1.5 bg-blue-500 text-white text-[9px] font-black rounded-full min-w-[16px] h-[16px] flex items-center justify-center border-2 border-white"
+                      className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-black rounded-full min-w-[16px] h-[16px] flex items-center justify-center border-2 border-white shadow-sm"
                     >
                       {cartCount}
                     </span>
@@ -87,7 +110,8 @@ const BottomNav = React.memo(() => {
                 </div>
 
                 <span
-                  className={`text-[10px] font-bold tracking-tight transition-all duration-150 ${isActive ? 'text-blue-600 scale-100 opacity-100' : 'text-gray-400 scale-95 opacity-80'}`}
+                  className={`text-[10px] font-bold tracking-tight transition-all duration-150 ${isActive ? 'scale-100 opacity-100' : 'text-gray-400 scale-95 opacity-80'}`}
+                  style={textStyle}
                 >
                   {item.label}
                 </span>
@@ -95,7 +119,8 @@ const BottomNav = React.memo(() => {
                 {isActive && (
                   <motion.div
                     layoutId="activeTabSlot"
-                    className="absolute -bottom-2 w-1 h-1 rounded-full bg-blue-600"
+                    className="absolute -bottom-2 w-1 h-1 rounded-full"
+                    style={indicatorStyle}
                   />
                 )}
               </div>

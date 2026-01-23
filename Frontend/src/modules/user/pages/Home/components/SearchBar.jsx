@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { FiSearch, FiSliders } from 'react-icons/fi';
+import { useNavigate } from 'react-router-dom';
+import { FiSearch, FiShoppingBag } from 'react-icons/fi';
+import { motion } from 'framer-motion';
 import { themeColors } from '../../../../../theme';
 
 const SearchBar = ({ onInputClick }) => {
+  const navigate = useNavigate();
   const [displayedText, setDisplayedText] = useState('');
   const [isTyping, setIsTyping] = useState(true);
   const [currentServiceIndex, setCurrentServiceIndex] = useState(0);
@@ -64,12 +67,58 @@ const SearchBar = ({ onInputClick }) => {
       </div>
 
       {/* Filter Button */}
-      <button
-        className="w-[52px] h-[52px] rounded-2xl bg-white border border-gray-100 flex items-center justify-center shadow-sm hover:shadow-md transition-all active:scale-95 group"
-        onClick={() => {/* Open filter */ }}
+      {/* Animated Pro Shop Button */}
+      {/* Powerful Animated Shop Button - No Box */}
+      <motion.button
+        className="flex flex-col items-center justify-center gap-0.5 px-1 bg-transparent outline-none group shrink-0 relative"
+        onClick={() => navigate('/user/shop')}
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.9 }}
       >
-        <FiSliders className="w-5 h-5 text-gray-700 group-hover:text-teal-600 transition-colors" />
-      </button>
+        <motion.div
+          animate={{
+            rotate: [0, -15, 15, -15, 15, 0],
+            scale: [1, 1.2, 1.2, 1.2, 1.2, 1],
+            filter: [
+              "drop-shadow(0px 0px 0px rgba(236, 72, 153, 0))",
+              "drop-shadow(0px 0px 8px rgba(236, 72, 153, 0.6))",
+              "drop-shadow(0px 0px 8px rgba(236, 72, 153, 0.6))",
+              "drop-shadow(0px 0px 8px rgba(236, 72, 153, 0.6))",
+              "drop-shadow(0px 0px 8px rgba(236, 72, 153, 0.6))",
+              "drop-shadow(0px 0px 0px rgba(236, 72, 153, 0))"
+            ]
+          }}
+          transition={{
+            duration: 1.5,
+            repeat: Infinity,
+            repeatDelay: 1.5,
+            ease: "easeInOut"
+          }}
+          className="relative"
+        >
+          {/* SVG Definition for Gradient Stroke */}
+          <svg width="0" height="0">
+            <defs>
+              <linearGradient id="bag-gradient" x1="100%" y1="100%" x2="0%" y2="0%">
+                <stop stopColor="#7C3AED" offset="0%" />
+                <stop stopColor="#DB2777" offset="100%" />
+              </linearGradient>
+            </defs>
+          </svg>
+
+          <FiShoppingBag
+            className="w-8 h-8"
+            style={{ stroke: "url(#bag-gradient)", strokeWidth: 2 }}
+          />
+
+          {/* Notification Dot */}
+          <div className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-yellow-400 rounded-full border-2 border-white pointer-events-none animate-bounce shadow-sm" />
+        </motion.div>
+
+        <span className="text-[10px] font-black uppercase tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-pink-600">
+          Shop
+        </span>
+      </motion.button>
     </div>
   );
 };
