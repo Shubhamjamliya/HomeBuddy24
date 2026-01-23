@@ -14,6 +14,7 @@ import {
   FiNavigation
 } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
+import shopService from '../../services/shopService';
 
 const ShopCheckoutPage = () => {
   const navigate = useNavigate();
@@ -35,7 +36,25 @@ const ShopCheckoutPage = () => {
   useEffect(() => {
     const savedCart = localStorage.getItem('shopCart');
     if (savedCart) {
-      setCartItems(JSON.parse(savedCart));
+      try {
+        const items = JSON.parse(savedCart);
+        // Assuming valid MongoDB ObjectId is 24 hex chars. 
+        // We'll filter out simple numeric IDs or short strings which are legacy.
+        const validItems = items.filter(item => {
+          const id = item.id || item._id;
+          return id && typeof id === 'string' && id.length === 24;
+        });
+
+        if (validItems.length < items.length) {
+          console.warn('Removed invalid/legacy items from cart');
+          // Update storage if we filtered anything
+          localStorage.setItem('shopCart', JSON.stringify(validItems));
+          window.dispatchEvent(new Event('shopCartUpdated'));
+        }
+        setCartItems(validItems);
+      } catch (e) {
+        console.error('Failed to parse cart', e);
+      }
     }
   }, []);
 
@@ -69,23 +88,59 @@ const ShopCheckoutPage = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handlePlaceOrder = () => {
-    const orderDetails = {
-      orderNumber: `ORD-${Math.floor(Math.random() * 9000000000000) + 1000000000000}`,
-      trackingNumber: `TRK${Math.random().toString(36).substring(2, 11).toUpperCase()}`,
-      date: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
-      total: total,
-      paymentMethod: paymentMethod === 'card' ? 'Credit Card' : paymentMethod === 'cod' ? 'Cash On Delivery' : 'Bank Transfer',
-      items: cartItems
-    };
+  const handlePlaceOrder = async () => {
+    try {
+      const orderPayload = {
+        items: cartItems.map(item => ({
+          product: item.id || item._id, // Ensure we pass the ID
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          image: item.image
+        })),
+        totalAmount: total,
+        subtotal: subtotal,
+        tax: tax,
+        shippingAddress: {
+          email: formData.email,
+          phone: formData.phone,
+          addressLine: formData.address,
+          city: formData.city,
+          state: formData.state,
+          zipCode: formData.zipCode,
+          country: formData.country
+        },
+        paymentMethod: paymentMethod,
+        paymentStatus: 'Pending'
+      };
 
-    toast.success('Order placed successfully!', {
-      icon: '🎉',
-      style: { borderRadius: '12px', background: '#333', color: '#fff' }
-    });
-    localStorage.removeItem('shopCart');
-    window.dispatchEvent(new Event('shopCartUpdated'));
-    navigate('/user/shop/confirmation', { state: { orderDetails } });
+      const response = await shopService.createOrder(orderPayload);
+
+      if (response.success) {
+        toast.success('Order placed successfully!', {
+          icon: '🎉',
+          style: { borderRadius: '12px', background: '#333', color: '#fff' }
+        });
+
+        const orderDetails = {
+          orderId: response.data._id, // Real backend ID
+          orderNumber: response.data.orderNumber,
+          trackingNumber: response.data.trackingNumber || 'Pending',
+          date: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+          total: total,
+          paymentMethod: paymentMethod === 'card' ? 'Credit Card' : paymentMethod === 'cod' ? 'Cash On Delivery' : 'Bank Transfer',
+          items: cartItems
+        };
+
+        localStorage.removeItem('shopCart');
+        window.dispatchEvent(new Event('shopCartUpdated'));
+        navigate('/user/shop/confirmation', { state: { orderDetails } });
+      }
+    } catch (error) {
+      console.error(error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to place order. Please try again.';
+      toast.error(errorMessage);
+    }
   };
 
   return (

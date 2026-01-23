@@ -13,16 +13,19 @@ import {
 } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 import { themeColors } from '../../../../theme';
-import { toast } from 'react-hot-toast';
+import shopService from '../../services/shopService';
 
 const ShopPage = () => {
   const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [cartCount, setCartCount] = useState(0);
-  const [flyingItems, setFlyingItems] = useState([]); // Track items currently animating to cart
+  const [flyingItems, setFlyingItems] = useState([]);
+  const [categories, setCategories] = useState([{ id: 'all', name: 'All', icon: '🏪', image: 'https://images.unsplash.com/photo-1513161455079-7dc1de15ef3e?auto=format&fit=crop&q=80&w=100' }]);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Sync cart count with localStorage
+  // Sync cart count
   const updateCartCount = () => {
     const savedCart = localStorage.getItem('shopCart');
     if (savedCart) {
@@ -35,7 +38,24 @@ const ShopPage = () => {
   };
 
   useEffect(() => {
-    updateCartCount();
+    // Check for legacy cart items (numeric IDs) and clear them
+    const savedCart = localStorage.getItem('shopCart');
+    if (savedCart) {
+      try {
+        const items = JSON.parse(savedCart);
+        const hasLegacyItems = items.some(item => typeof item.id === 'number' || (typeof item.id === 'string' && item.id.length < 10));
+        if (hasLegacyItems) {
+          localStorage.removeItem('shopCart');
+          setCartCount(0);
+          console.log('Cleared legacy cart items');
+        } else {
+          updateCartCount();
+        }
+      } catch (e) {
+        localStorage.removeItem('shopCart');
+      }
+    }
+
     window.addEventListener('shopCartUpdated', updateCartCount);
     window.addEventListener('storage', updateCartCount);
     return () => {
@@ -44,72 +64,71 @@ const ShopPage = () => {
     };
   }, []);
 
-  const categories = [
-    { id: 1, name: 'All', icon: '🏪', image: 'https://images.unsplash.com/photo-1513161455079-7dc1de15ef3e?auto=format&fit=crop&q=80&w=100' },
-    { id: 2, name: 'Appliances', icon: '📺', image: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&q=80&w=100' },
-    { id: 3, name: 'Cleaning', icon: '🧹', image: 'https://images.unsplash.com/photo-1558317374-067fb5f30001?auto=format&fit=crop&q=80&w=100' },
-    { id: 4, name: 'Security', icon: '🔒', image: 'https://images.unsplash.com/photo-1558002038-103590318282?auto=format&fit=crop&q=80&w=100' },
-    { id: 5, name: 'Smart Home', icon: '🏠', image: 'https://images.unsplash.com/photo-1550524514-966953390111?auto=format&fit=crop&q=80&w=100' },
-    { id: 6, name: 'Electronics', icon: '💻', image: 'https://images.unsplash.com/photo-1526733169359-ab1142275022?auto=format&fit=crop&q=80&w=100' },
-  ];
+  // Fetch Data
+  // Fetch Categories
+  useEffect(() => {
+    let isMounted = true;
+    const fetchCategories = async () => {
+      try {
+        const catRes = await shopService.getCategories();
+        if (isMounted && catRes.success) {
+          const mappedCats = (catRes.data || []).map(c => ({
+            id: c._id,
+            name: c.name,
+            icon: c.icon || '📦',
+            image: c.icon || c.image
+          }));
+          setCategories(prev => [
+            { id: 'all', name: 'All', icon: '🏪', image: 'https://images.unsplash.com/photo-1513161455079-7dc1de15ef3e?auto=format&fit=crop&q=80&w=100' },
+            ...mappedCats
+          ]);
+        }
+      } catch (error) {
+        console.error('Failed to load categories', error);
+      }
+    };
+    fetchCategories();
+    return () => { isMounted = false; };
+  }, []);
 
-  const products = [
-    {
-      id: 1,
-      name: 'Mi Smart Air Purifier 4',
-      category: 'Appliances',
-      price: 14999,
-      originalPrice: 19999,
-      rating: 4.8,
-      reviews: 1250,
-      image: 'https://images.unsplash.com/photo-1585771724684-252702224483?auto=format&fit=crop&q=80&w=400',
-      tag: 'Best Seller'
-    },
-    {
-      id: 2,
-      name: 'Dyson V12 Detect Slim',
-      category: 'Cleaning',
-      price: 45900,
-      originalPrice: 52900,
-      rating: 4.9,
-      reviews: 850,
-      image: 'https://images.unsplash.com/photo-1558317374-067fb5f30001?auto=format&fit=crop&q=80&w=400',
-      tag: 'Premium'
-    },
-    {
-      id: 3,
-      name: 'Ring Video Doorbell',
-      category: 'Security',
-      price: 8999,
-      originalPrice: 12999,
-      rating: 4.7,
-      reviews: 3200,
-      image: 'https://images.unsplash.com/photo-1558002038-103590318282?auto=format&fit=crop&q=80&w=400',
-      tag: 'Top Rated'
-    },
-    {
-      id: 4,
-      name: 'Philips Hue Smart Bulb',
-      category: 'Smart Home',
-      price: 2499,
-      originalPrice: 3500,
-      rating: 4.6,
-      reviews: 5400,
-      image: 'https://images.unsplash.com/photo-1550524514-966953390111?auto=format&fit=crop&q=80&w=400',
-      tag: 'Popular'
-    },
-    {
-      id: 5,
-      name: 'Samsung 9kg Washer',
-      category: 'Appliances',
-      price: 36990,
-      originalPrice: 42000,
-      rating: 4.5,
-      reviews: 1100,
-      image: 'https://images.unsplash.com/photo-1626806819282-2c1dc61a0e04?auto=format&fit=crop&q=80&w=400',
-      tag: 'New'
-    }
-  ];
+  // Fetch Products
+  useEffect(() => {
+    let isMounted = true;
+    const fetchProducts = async () => {
+      try {
+        setLoading(true);
+        const prodRes = await shopService.getProducts({ limit: 100 });
+        if (isMounted) {
+          if (prodRes.success) {
+            const productsData = prodRes.data || prodRes.products || [];
+            const mappedProds = productsData.map(p => ({
+              id: p._id,
+              name: p.name,
+              category: p.category?.name || 'Uncategorized',
+              price: p.price,
+              originalPrice: p.originalPrice,
+              rating: p.rating || 0,
+              reviews: p.reviewsCount || 0,
+              image: (p.images && p.images.length > 0) ? p.images[0] : (p.image || 'https://via.placeholder.com/150'),
+              tag: p.tag || (p.price > 10000 ? 'Premium' : 'Popular'),
+              description: p.description
+            }));
+            setProducts(mappedProds);
+          } else {
+            // If failure, don't crash, just show empty or previous
+            console.error("Product fetch failed:", prodRes);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load products', error);
+        toast.error('Failed to load shop data');
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+    fetchProducts();
+    return () => { isMounted = false; };
+  }, []);
 
   const handleAddToCart = (e, p) => {
     // Get button position for animation start
@@ -149,7 +168,7 @@ const ShopPage = () => {
       (activeCategory === 'All' || p.category === activeCategory) &&
       (p.name.toLowerCase().includes(searchQuery.toLowerCase()))
     );
-  }, [activeCategory, searchQuery]);
+  }, [activeCategory, searchQuery, products]);
 
   return (
     <div className="min-h-screen bg-white pb-20 flex flex-col h-screen overflow-hidden">
@@ -189,7 +208,9 @@ const ShopPage = () => {
                 : 'border-white group-hover:border-gray-200'
                 }`}>
                 <img src={cat.image} alt={cat.name} className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-black/5 flex items-center justify-center text-lg">{cat.icon}</div>
+                {!cat.icon?.startsWith('http') && (
+                  <div className="absolute inset-0 bg-black/5 flex items-center justify-center text-lg">{cat.icon}</div>
+                )}
               </div>
               <span className={`text-[10px] font-bold text-center px-1 leading-tight ${activeCategory === cat.name ? 'text-blue-500' : 'text-gray-500'
                 }`}>
@@ -211,7 +232,8 @@ const ShopPage = () => {
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
                   transition={{ duration: 0.2 }}
-                  className="bg-gray-50 rounded-[28px] overflow-hidden border border-gray-100 flex flex-col group"
+                  className="bg-gray-50 rounded-[28px] overflow-hidden border border-gray-100 flex flex-col group cursor-pointer"
+                  onClick={() => navigate(`/user/shop/product/${p.id}`)}
                 >
                   <div className="relative aspect-[1/1] bg-white rounded-b-[24px] overflow-hidden">
                     <img src={p.image} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
@@ -239,7 +261,10 @@ const ShopPage = () => {
                     </div>
 
                     <button
-                      onClick={(e) => handleAddToCart(e, p)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAddToCart(e, p);
+                      }}
                       className="w-full py-2 bg-blue-500 text-white rounded-xl text-[12px] font-bold flex items-center justify-center gap-1.5 shadow-lg shadow-blue-100 active:scale-95 transition-all"
                     >
                       <FiPlus className="w-4 h-4" />

@@ -36,6 +36,7 @@ const iconMap = {
   Settlements: FiDollarSign,
   Settings: FiSettings,
   Plans: FiPackage,
+  Shop: FiShoppingBag,
 };
 
 // Helper function to convert child name to route path
@@ -100,6 +101,12 @@ const getChildRoute = (parentRoute, childName) => {
       "Withdrawals": "/admin/settlements/withdrawals",
       "Vendors with Due": "/admin/settlements/vendors",
       "History": "/admin/settlements/history",
+    },
+    "/admin/shop": {
+      "Categories": "/admin/shop/categories",
+      "Products": "/admin/shop/products",
+      "Orders": "/admin/shop/orders",
+      "Track": "/admin/shop/track",
     },
   };
 

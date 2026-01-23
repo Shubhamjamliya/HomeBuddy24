@@ -18,7 +18,8 @@ import {
   FiCreditCard,
   FiSettings,
   FiChevronRight,
-  FiBell
+  FiBell,
+  FiShoppingBag
 } from 'react-icons/fi';
 import { MdAccountBalanceWallet } from 'react-icons/md';
 
@@ -108,6 +109,7 @@ const Account = () => {
   };
 
   const menuItems = [
+    { id: 10, label: 'My Orders', icon: FiShoppingBag },
     { id: 1, label: 'My Plans', icon: FiFileText },
     { id: 2, label: 'Wallet', icon: MdAccountBalanceWallet },
     { id: 4, label: 'My rating', icon: FiStar },
@@ -132,6 +134,8 @@ const Account = () => {
   const handleMenuClick = (item) => {
     if (item.label === 'Settings') {
       navigate('/user/settings');
+    } else if (item.label === 'My Orders') {
+      navigate('/user/shop/orders');
     } else if (item.label === 'Manage payment methods') {
       navigate('/user/manage-payment-methods');
     } else if (item.label === 'Manage addresses') {

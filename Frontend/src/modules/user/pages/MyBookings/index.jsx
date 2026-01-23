@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiArrowLeft, FiClock, FiMapPin, FiCheckCircle, FiXCircle, FiLoader, FiCalendar, FiChevronRight } from 'react-icons/fi';
+import { FiArrowLeft, FiCalendar } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
 import { themeColors } from '../../../../theme';
-import LoadingSpinner from '../../components/common/LoadingSpinner';
 import NotificationBell from '../../components/common/NotificationBell';
 import { motion } from 'framer-motion';
 import { bookingService } from '../../../../services/bookingService';
+import BookingCard from './components/BookingCard';
+import SkeletonBookingCard from './components/SkeletonBookingCard';
 
 const MyBookings = () => {
   const navigate = useNavigate();
@@ -15,6 +16,7 @@ const MyBookings = () => {
   const [filter, setFilter] = useState('all'); // all, confirmed, in-progress, completed, cancelled
 
   useEffect(() => {
+    let isMounted = true;
     const loadBookings = async () => {
       try {
         setLoading(true);
@@ -23,326 +25,151 @@ const MyBookings = () => {
           params.status = filter;
         }
         const response = await bookingService.getUserBookings(params);
-        if (response.success) {
-          setBookings(response.data || []);
-        } else {
-          toast.error(response.message || 'Failed to load bookings');
-          setBookings([]);
+        if (isMounted) {
+          if (response.success) {
+            setBookings(response.data || []);
+          } else {
+            toast.error(response.message || 'Failed to load bookings');
+            setBookings([]);
+          }
         }
       } catch (error) {
-        toast.error('Failed to load bookings. Please try again.');
-        setBookings([]);
+        if (isMounted) {
+          console.error('Failed to load bookings', error);
+          // Silent catch to handle network aborts or minor issues without annoying toast on mount sometimes
+          setBookings([]);
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     loadBookings();
 
     // Listen for real-time updates
-    window.addEventListener('userBookingsUpdated', loadBookings);
+    const handleUpdate = () => loadBookings();
+    window.addEventListener('userBookingsUpdated', handleUpdate);
 
     return () => {
-      window.removeEventListener('userBookingsUpdated', loadBookings);
+      isMounted = false;
+      window.removeEventListener('userBookingsUpdated', handleUpdate);
     };
   }, [filter]);
 
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'confirmed':
-        return <FiCheckCircle className="w-3.5 h-3.5" />;
-      case 'in_progress':
-      case 'in-progress':
-        return <FiLoader className="w-3.5 h-3.5 animate-spin" />;
-      case 'journey_started':
-      case 'visited':
-        return <FiMapPin className="w-3.5 h-3.5 text-blue-500" />;
-      case 'completed':
-        return <FiCheckCircle className="w-3.5 h-3.5" />;
-      case 'cancelled':
-      case 'rejected':
-        return <FiXCircle className="w-3.5 h-3.5" />;
-      case 'awaiting_payment':
-      default:
-        return <FiClock className="w-3.5 h-3.5" />;
-    }
-  };
-
-  const getStatusBorderColor = (status) => {
-    switch (status) {
-      case 'confirmed': return '!border-l-emerald-500';
-      case 'in_progress':
-      case 'in-progress':
-      case 'journey_started':
-      case 'visited':
-        return '!border-l-blue-500';
-      case 'completed': return '!border-l-violet-500';
-      case 'cancelled':
-      case 'rejected': return '!border-l-rose-500';
-      case 'awaiting_payment': return '!border-l-amber-500';
-      default: return '!border-l-gray-300';
-    }
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'confirmed':
-        return 'bg-emerald-500 text-white border-emerald-600 ring-emerald-500';
-      case 'in_progress':
-      case 'in-progress':
-      case 'journey_started':
-      case 'visited':
-        return 'bg-blue-500 text-white border-blue-600 ring-blue-500';
-      case 'completed':
-        return 'bg-violet-500 text-white border-violet-600 ring-violet-500';
-      case 'cancelled':
-      case 'rejected':
-        return 'bg-rose-500 text-white border-rose-600 ring-rose-500';
-      case 'awaiting_payment':
-        return 'bg-amber-500 text-white border-amber-600 ring-amber-500';
-      default:
-        return 'bg-gray-500 text-white border-gray-600 ring-gray-500';
-    }
-  };
-
-  const getStatusLabel = (status) => {
-    if (!status) return 'Unknown';
-    switch (status) {
-      case 'in_progress':
-      case 'in-progress':
-        return 'In Progress';
-      case 'journey_started': return 'On The Way';
-      case 'visited': return 'Arrived';
-      case 'awaiting_payment': return 'Request Accepted';
-      case 'work_done': return 'Work Completed';
-      default: return status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ');
-    }
-  };
-
-  const handleBookingClick = (booking) => {
+  const handleBookingClick = useCallback((booking) => {
     navigate(`/user/booking/${booking._id || booking.id}`);
+  }, [navigate]);
+
+  // Helper for background gradient from Home theme
+  const backgroundStyle = {
+    background: 'radial-gradient(at 0% 0%, #BAE6FD 0%, transparent 70%), radial-gradient(at 100% 0%, #FED7AA 0%, transparent 70%), #F1F5F9',
+    minHeight: '100vh'
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    });
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
   };
 
-  const formatTime = (timeString) => {
-    if (!timeString) return 'N/A';
-    return timeString;
-  };
-
-  const getAddressString = (address) => {
-    if (typeof address === 'string') return address;
-    if (address && typeof address === 'object') {
-      const parts = [
-        address.addressLine1,
-        address.addressLine2,
-        address.city
-      ].filter(Boolean);
-      return parts.join(', ');
-    }
-    return 'Detailed Address';
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 100, damping: 15 } }
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] pb-24">
-      {/* Header */}
-      <header className="bg-white/80 backdrop-blur-lg border-b border-slate-100 sticky top-0 z-30 transition-all">
-        <div className="px-4 pt-4 pb-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate(-1)}
-              className="p-2.5 hover:bg-slate-50 active:bg-slate-100 rounded-full transition-colors text-slate-700"
-            >
-              <FiArrowLeft className="w-5 h-5" />
-            </button>
-            <h1 className="text-xl font-bold text-slate-900 tracking-tight">My Bookings</h1>
-          </div>
-
-          {/* Notification Bell with Vendor Style */}
+    <div style={backgroundStyle} className="pb-24">
+      {/* Modern Glass Header */}
+      <header className="sticky top-0 z-40 px-4 py-4 flex items-center justify-between bg-white/60 backdrop-blur-xl border-b border-white/20">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate(-1)}
+            className="w-10 h-10 rounded-full bg-white/50 hover:bg-white flex items-center justify-center transition-all shadow-sm active:scale-95"
+          >
+            <FiArrowLeft className="w-5 h-5 text-gray-800" />
+          </button>
+          <h1 className="text-xl font-bold text-gray-900 tracking-tight">My Bookings</h1>
+        </div>
+        <div className="bg-white/50 rounded-full p-1">
           <NotificationBell />
         </div>
       </header>
 
-      {/* Filter Tabs */}
-      <div className="bg-white border-b border-slate-100 sticky top-[61px] z-20 shadow-[0_4px_20px_-16px_rgba(0,0,0,0.1)]">
-        <div className="flex overflow-x-auto px-4 py-3 gap-2.5 no-scrollbar scroll-smooth">
+      {/* Modern Floating Filter Tabs */}
+      <div className="sticky top-[72px] z-30 py-2 overflow-x-auto no-scrollbar px-4 mb-2">
+        <div className="flex gap-3 min-w-max">
           {[
-            { id: 'all', label: 'All Bookings' },
+            { id: 'all', label: 'All' },
             { id: 'confirmed', label: 'Confirmed' },
-            { id: 'in-progress', label: 'In Progress' },
+            { id: 'in-progress', label: 'Active' },
             { id: 'completed', label: 'Completed' },
             { id: 'cancelled', label: 'Cancelled' },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setFilter(tab.id)}
-              className={`px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-all duration-200 border ${filter === tab.id
-                ? 'border-transparent text-white shadow-lg shadow-blue-500/25 active:scale-95'
-                : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 hover:border-slate-300'
-                }`}
-              style={filter === tab.id ? { backgroundColor: themeColors.button } : {}}
-            >
-              {tab.label}
-            </button>
-          ))}
+          ].map((tab) => {
+            const isActive = filter === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setFilter(tab.id)}
+                className={`px-5 py-2.5 rounded-2xl text-sm font-bold transition-all duration-300 ${isActive
+                  ? 'bg-gray-900 text-white shadow-lg shadow-gray-900/20 scale-105'
+                  : 'bg-white/80 text-gray-500 hover:bg-white shadow-sm'
+                  }`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {/* Bookings List */}
-      <main className="px-4 py-5 max-w-lg mx-auto w-full">
+      <main className="px-4 py-2 max-w-lg mx-auto w-full min-h-[60vh]">
         {loading ? (
           <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm animate-pulse">
-                <div className="flex justify-between mb-4 border-b border-slate-100 pb-4">
-                  <div className="space-y-2">
-                    <div className="h-3 w-20 bg-slate-200 rounded"></div>
-                    <div className="h-5 w-48 bg-slate-200 rounded"></div>
-                  </div>
-                  <div className="h-6 w-24 bg-slate-200 rounded-full"></div>
-                </div>
-                <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-4 mb-5 p-3 rounded-xl bg-slate-50 border border-slate-200">
-                  <div className="w-8 h-8 rounded-full bg-slate-200"></div>
-                  <div className="space-y-1.5 py-1">
-                    <div className="h-2.5 w-16 bg-slate-200 rounded"></div>
-                    <div className="h-3.5 w-32 bg-slate-200 rounded"></div>
-                  </div>
-                  <div className="w-8 h-8 rounded-full bg-slate-200"></div>
-                  <div className="space-y-1.5 py-1">
-                    <div className="h-2.5 w-16 bg-slate-200 rounded"></div>
-                    <div className="h-3.5 w-40 bg-slate-200 rounded"></div>
-                  </div>
-                </div>
-                <div className="flex justify-between pt-4 border-t border-slate-200">
-                  <div className="space-y-1">
-                    <div className="h-2.5 w-16 bg-slate-200 rounded"></div>
-                    <div className="h-6 w-24 bg-slate-200 rounded"></div>
-                  </div>
-                  <div className="h-9 w-28 bg-slate-200 rounded-lg"></div>
-                </div>
-              </div>
-            ))}
+            <SkeletonBookingCard />
+            <SkeletonBookingCard />
+            <SkeletonBookingCard />
           </div>
         ) : bookings.length === 0 ? (
           <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
+            initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="flex flex-col items-center justify-center py-24 text-center px-6"
+            className="flex flex-col items-center justify-center py-20 text-center bg-white/40 backdrop-blur-sm rounded-3xl border border-white/50 p-8 shadow-sm mx-2"
           >
-            <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6 border border-slate-100 shadow-sm">
-              <FiClock className="w-8 h-8 text-slate-300" />
+            <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mb-6 shadow-xl shadow-blue-100/50">
+              <FiCalendar className="w-10 h-10 text-blue-500" />
             </div>
-            <h3 className="text-slate-900 text-lg font-bold mb-2">No Bookings Found</h3>
-            <p className="text-slate-500 text-sm max-w-xs leading-relaxed">
+            <h3 className="text-gray-900 text-xl font-bold mb-2">No Bookings Found</h3>
+            <p className="text-gray-500 text-sm max-w-[240px] leading-relaxed mb-6">
               {filter === 'all'
-                ? "Looks like you haven't booked any services yet. Explore our services to get started!"
-                : `You don't have any ${filter.replace('-', ' ')} bookings at the moment.`}
+                ? "You haven't booked any services yet. Start your journey with HomeBuddy!"
+                : `No ${filter} bookings found.`}
             </p>
+            {filter === 'all' && (
+              <button
+                onClick={() => navigate('/user')}
+                className="px-8 py-3 bg-gray-900 text-white rounded-xl font-bold text-sm shadow-xl shadow-gray-900/10 active:scale-95 transition-transform"
+              >
+                Book a Service
+              </button>
+            )}
           </motion.div>
         ) : (
           <motion.div
+            variants={containerVariants}
             initial="hidden"
             animate="visible"
-            variants={{
-              hidden: { opacity: 0 },
-              visible: {
-                opacity: 1,
-                transition: { staggerChildren: 0.1 }
-              }
-            }}
             className="space-y-4"
           >
             {bookings.map((booking) => (
-              <motion.div
+              <BookingCard
                 key={booking._id || booking.id}
-                variants={{
-                  hidden: { opacity: 0, y: 20 },
-                  visible: {
-                    opacity: 1,
-                    y: 0,
-                    transition: { type: "spring", stiffness: 100, damping: 15 }
-                  }
-                }}
-                onClick={() => handleBookingClick(booking)}
-                className={`group relative bg-white rounded-2xl p-5 border border-slate-200 border-l-4 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_-8px_rgba(0,0,0,0.08)] hover:border-blue-300 active:scale-[0.99] transition-all duration-300 cursor-pointer overflow-hidden ${getStatusBorderColor(booking.status)}`}
-              >
-                {/* Decorative Elements */}
-                <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-slate-50 via-transparent to-transparent -z-0 opacity-50" />
-
-                {/* Header Section */}
-                <div className="relative z-10 flex items-start justify-between mb-4 border-b border-slate-100 pb-4">
-                  <div className="pr-4">
-                    <p className="text-[10px] font-bold tracking-wider text-slate-400 uppercase mb-1.5 flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
-                      #{booking.bookingNumber || (booking._id || booking.id).substring(0, 8)}
-                    </p>
-                    <h3 className="text-lg font-bold text-slate-800 leading-tight line-clamp-1 group-hover:text-blue-600 transition-colors">
-                      {booking.serviceName || booking.serviceCategory || 'Service Request'}
-                    </h3>
-                  </div>
-
-                  {/* Status Badge */}
-                  <div className={`px-3 py-1 pb-1.5 rounded-full border ring-1 ring-inset flex items-center gap-1.5 shadow-sm ${getStatusColor(booking.status)}`}>
-                    {getStatusIcon(booking.status)}
-                    <span className="text-[11px] font-bold uppercase tracking-wide">
-                      {getStatusLabel(booking.status)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Details Grid */}
-                <div className="relative z-10 grid grid-cols-[auto_1fr] gap-x-3 gap-y-4 mb-5 p-3 rounded-xl bg-slate-50/50 border border-slate-200">
-                  {/* Schedule */}
-                  <div className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center shrink-0 shadow-sm">
-                    <FiCalendar className="w-4 h-4 text-blue-500" />
-                  </div>
-                  <div className="flex flex-col justify-center">
-                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Scheduled For</p>
-                    <div className="flex items-center gap-1.5 text-sm font-bold text-slate-700">
-                      <span>{formatDate(booking.scheduledDate)}</span>
-                      <span className="text-slate-300">•</span>
-                      <span>{booking.scheduledTime || booking.timeSlot?.start || 'N/A'}</span>
-                    </div>
-                  </div>
-
-                  {/* Location */}
-                  <div className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center shrink-0 shadow-sm">
-                    <FiMapPin className="w-4 h-4 text-rose-500" />
-                  </div>
-                  <div className="flex flex-col justify-center min-w-0">
-                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Location</p>
-                    <p className="text-sm font-medium text-slate-700 truncate w-full">
-                      {getAddressString(booking.address)}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Footer Section */}
-                <div className="relative z-10 flex items-center justify-between pt-4 border-t border-slate-200">
-                  <div>
-                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-0.5">Total Amount</p>
-                    <p className="text-xl font-bold text-slate-900 flex items-baseline gap-0.5">
-                      <span className="text-sm font-semibold text-slate-400">₹</span>
-                      {(booking.finalAmount || booking.totalAmount || 0).toLocaleString('en-IN')}
-                    </p>
-                  </div>
-
-                  <button
-                    className="flex items-center gap-1.5 pl-4 pr-3 py-2 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-600 font-bold text-sm hover:bg-indigo-600 hover:border-indigo-600 hover:text-white transition-all shadow-sm active:scale-95"
-                  >
-                    View Details
-                    <FiChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </motion.div>
+                booking={booking}
+                onClick={handleBookingClick}
+                variants={itemVariants}
+              // Optional: pass style props or callbacks if needed
+              />
             ))}
           </motion.div>
         )}

@@ -131,6 +131,20 @@
     "children": []
   },
   {
+    "title": "Shop",
+    "route": "/admin/shop",
+    "allowedRoles": [
+      "super_admin",
+      "admin"
+    ],
+    "children": [
+      "Categories",
+      "Products",
+      "Orders",
+      "Track"
+    ]
+  },
+  {
     "title": "Settings",
     "route": "/admin/settings",
     "allowedRoles": [

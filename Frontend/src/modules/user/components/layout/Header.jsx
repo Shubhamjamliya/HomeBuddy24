@@ -50,7 +50,7 @@ const Header = ({ location, onLocationClick }) => {
   };
 
   return (
-    <header className="px-5 pt-8 pb-3 bg-transparent relative z-10 w-full max-w-lg mx-auto">
+    <header className="px-5 pt-8 pb-3 bg-transparent relative z-[1000] w-full max-w-lg mx-auto">
       <div className="flex items-center justify-between w-full">
         {/* Left: Profile & Greeting */}
         <div className="flex items-center gap-3" onClick={() => navigate('/user/account')}>

@@ -60,6 +60,10 @@ const Shop = lazyLoad(() => import('../pages/Shop'));
 const ShopCart = lazyLoad(() => import('../pages/Shop/Cart'));
 const ShopCheckout = lazyLoad(() => import('../pages/Shop/Checkout'));
 const ShopConfirmation = lazyLoad(() => import('../pages/Shop/Confirmation'));
+const ShopTrack = lazyLoad(() => import('../pages/Shop/Track'));
+const ShopOrders = lazyLoad(() => import('../pages/Shop/Orders'));
+const ShopOrderDetails = lazyLoad(() => import('../pages/Shop/OrderDetails'));
+const ShopProductDetails = lazyLoad(() => import('../pages/Shop/ProductDetails'));
 const Notifications = lazyLoad(() => import('../pages/Notifications'));
 const HelpSupport = lazyLoad(() => import('../pages/HelpSupport'));
 
@@ -137,6 +141,10 @@ const UserRoutes = () => {
             <Route path="/shop/cart" element={<ProtectedRoute userType="user"><ShopCart /></ProtectedRoute>} />
             <Route path="/shop/checkout" element={<ProtectedRoute userType="user"><ShopCheckout /></ProtectedRoute>} />
             <Route path="/shop/confirmation" element={<ProtectedRoute userType="user"><ShopConfirmation /></ProtectedRoute>} />
+            <Route path="/shop/product/:id" element={<ProtectedRoute userType="user"><ShopProductDetails /></ProtectedRoute>} />
+            <Route path="/shop/track/:id" element={<ProtectedRoute userType="user"><ShopTrack /></ProtectedRoute>} />
+            <Route path="/shop/orders" element={<ProtectedRoute userType="user"><ShopOrders /></ProtectedRoute>} />
+            <Route path="/shop/orders/:id" element={<ProtectedRoute userType="user"><ShopOrderDetails /></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute userType="user"><Notifications /></ProtectedRoute>} />
             <Route path="/help-support" element={<ProtectedRoute userType="user"><HelpSupport /></ProtectedRoute>} />
             <Route path="/:slug" element={<ProtectedRoute userType="user"><ServiceDynamic /></ProtectedRoute>} />
