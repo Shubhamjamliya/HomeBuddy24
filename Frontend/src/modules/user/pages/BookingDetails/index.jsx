@@ -466,10 +466,6 @@ const BookingDetails = () => {
                 ID: <span className="font-mono">{booking.bookingNumber || booking._id?.slice(-8).toUpperCase()}</span>
               </p>
             </div>
-            <div className={`px-3 py-1 rounded-full flex items-center gap-1.5 ${getStatusColor(booking.status)}`}>
-              {getStatusIcon(booking.status)}
-              <span className="text-xs font-bold uppercase tracking-wide">{getStatusLabel(booking.status)}</span>
-            </div>
           </div>
         </div>
       </header>
@@ -536,6 +532,14 @@ const BookingDetails = () => {
             </div>
           </div>
         )}
+
+        {/* Status Badge */}
+        <div className="flex items-center justify-center">
+          <div className={`px-4 py-2 rounded-full flex items-center gap-2 shadow-sm border ${getStatusColor(booking.status)}`}>
+            {getStatusIcon(booking.status)}
+            <span className="text-xs font-black uppercase tracking-wider">{getStatusLabel(booking.status)}</span>
+          </div>
+        </div>
 
         {/* Service Partner Card */}
         {(booking.workerId || booking.assignedTo || booking.vendorId) && ['confirmed', 'assigned', 'journey_started', 'visited', 'in_progress', 'work_done'].includes(booking.status?.toLowerCase()) && (

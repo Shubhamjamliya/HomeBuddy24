@@ -74,24 +74,26 @@ const WorkerRoutes = () => {
   return (
     <ErrorBoundary>
       <Suspense fallback={<LoadingFallback />}>
-        <Routes>
-          {/* Public routes */}
-          <Route path="/login" element={<PublicRoute userType="worker"><Login /></PublicRoute>} />
-          <Route path="/signup" element={<PublicRoute userType="worker"><Signup /></PublicRoute>} />
+        <PageTransition>
+          <Routes>
+            {/* Public routes */}
+            <Route path="/login" element={<PublicRoute userType="worker"><Login /></PublicRoute>} />
+            <Route path="/signup" element={<PublicRoute userType="worker"><Signup /></PublicRoute>} />
 
-          {/* Protected routes (auth required) */}
-          <Route path="/" element={<ProtectedRoute userType="worker"><Navigate to="dashboard" replace /></ProtectedRoute>} />
-          <Route path="/dashboard" element={<ProtectedRoute userType="worker"><Dashboard /></ProtectedRoute>} />
-          <Route path="/jobs" element={<ProtectedRoute userType="worker"><AssignedJobs /></ProtectedRoute>} />
-          <Route path="/job/:id" element={<ProtectedRoute userType="worker"><JobDetails /></ProtectedRoute>} />
-          <Route path="/job/:id/map" element={<ProtectedRoute userType="worker"><JobMap /></ProtectedRoute>} />
-          <Route path="/job/:id/timeline" element={<ProtectedRoute userType="worker"><JobTimeline /></ProtectedRoute>} />
-          <Route path="/profile" element={<ProtectedRoute userType="worker"><Profile /></ProtectedRoute>} />
-          <Route path="/profile/edit" element={<ProtectedRoute userType="worker"><EditProfile /></ProtectedRoute>} />
-          <Route path="/settings" element={<ProtectedRoute userType="worker"><Settings /></ProtectedRoute>} />
-          <Route path="/notifications" element={<ProtectedRoute userType="worker"><Notifications /></ProtectedRoute>} />
-          <Route path="/wallet" element={<ProtectedRoute userType="worker"><Wallet /></ProtectedRoute>} />
-        </Routes>
+            {/* Protected routes (auth required) */}
+            <Route path="/" element={<ProtectedRoute userType="worker"><Navigate to="dashboard" replace /></ProtectedRoute>} />
+            <Route path="/dashboard" element={<ProtectedRoute userType="worker"><Dashboard /></ProtectedRoute>} />
+            <Route path="/jobs" element={<ProtectedRoute userType="worker"><AssignedJobs /></ProtectedRoute>} />
+            <Route path="/job/:id" element={<ProtectedRoute userType="worker"><JobDetails /></ProtectedRoute>} />
+            <Route path="/job/:id/map" element={<ProtectedRoute userType="worker"><JobMap /></ProtectedRoute>} />
+            <Route path="/job/:id/timeline" element={<ProtectedRoute userType="worker"><JobTimeline /></ProtectedRoute>} />
+            <Route path="/profile" element={<ProtectedRoute userType="worker"><Profile /></ProtectedRoute>} />
+            <Route path="/profile/edit" element={<ProtectedRoute userType="worker"><EditProfile /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute userType="worker"><Settings /></ProtectedRoute>} />
+            <Route path="/notifications" element={<ProtectedRoute userType="worker"><Notifications /></ProtectedRoute>} />
+            <Route path="/wallet" element={<ProtectedRoute userType="worker"><Wallet /></ProtectedRoute>} />
+          </Routes>
+        </PageTransition>
       </Suspense>
       {!shouldHideBottomNav && <BottomNav />}
     </ErrorBoundary>
