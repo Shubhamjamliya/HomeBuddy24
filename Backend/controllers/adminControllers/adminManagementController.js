@@ -159,10 +159,94 @@ const updateAdminRole = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to update admin role' });
   }
 };
+/**
+ * Update admin details (Super Admin only)
+ */
+const updateAdminDetails = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, email, password, role } = req.body;
+
+    const admin = await Admin.findById(id);
+
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        message: 'Admin not found'
+      });
+    }
+
+    // Update basic fields
+    if (name) admin.name = name;
+    if (email) admin.email = email;
+    if (role) admin.role = role;
+
+    // Update password if provided
+    if (password) {
+      admin.password = password;
+    }
+
+    await admin.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Admin updated successfully',
+      data: {
+        id: admin._id,
+        name: admin.name,
+        email: admin.email,
+        role: admin.role,
+        isActive: admin.isActive
+      }
+    });
+
+  } catch (error) {
+    console.error('Update admin details error:', error);
+    res.status(500).json({ success: false, message: 'Failed to update admin' });
+  }
+};
+
+/**
+ * Toggle admin active status (Super Admin only)
+ */
+const toggleAdminStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const admin = await Admin.findById(id);
+    if (!admin) {
+      return res.status(404).json({ success: false, message: 'Admin not found' });
+    }
+
+    // Prevent deactivating super admin
+    if (admin.role === 'super_admin') {
+      // Optional: Allow deactivating other super admins if needed, 
+      // but typically protect the main one or all.
+      if (admin.email === 'admin@admin.com') {
+        return res.status(400).json({ success: false, message: 'Cannot deactivate primary super admin' });
+      }
+    }
+
+    admin.isActive = !admin.isActive;
+    await admin.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Admin ${admin.isActive ? 'activated' : 'deactivated'} successfully`,
+      data: { isActive: admin.isActive }
+    });
+
+  } catch (error) {
+    console.error('Toggle admin status error:', error);
+    res.status(500).json({ success: false, message: 'Failed to update status' });
+  }
+};
 
 module.exports = {
   getAllAdmins,
   createAdmin,
   deleteAdmin,
-  updateAdminRole
+  updateAdminRole,
+  updateAdminDetails,
+  toggleAdminStatus
 };
